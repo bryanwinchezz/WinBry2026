@@ -1304,7 +1304,7 @@ body.light-mode .menu-toggle,
 body.light-mode #user-action,
 body.light-mode #search-icon {
     color: #ffffff !important;
-    text-shadow: 0 2px 5px rgba(0,0,0,0.8);
+    text-shadow: 0 2px 5px rgba(0, 0, 0, 0.8);
 }
 
 body.light-mode .logo a {
@@ -1359,7 +1359,7 @@ body.light-mode .qualidade {
 
 body.light-mode .classificacao {
     color: #ffffff !important;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
 }
 
 body.light-mode .details-poster {
@@ -1412,146 +1412,153 @@ body.light-mode .btn-lista {
     padding-top: var(--spacing-xl);
 }
 
+/* =================================================================
+   RESPONSIVIDADE PROFISSIONAL (MOBILE & TABLET)
+   ================================================================= */
+
+/* --- 1. LAPTOPS E TABLETS GRANDES (Max: 1200px) --- */
 @media (max-width: 1200px) {
-    .details-info {
-        flex-direction: column;
-        align-items: flex-start;
-        padding-top: var(--spacing-xl);
-    }
-
-    .details-poster {
-        width: 200px;
-        height: 280px;
-        margin-bottom: var(--spacing-lg);
-    }
-
-    .info-text h1 {
-        font-size: 2.2rem;
-    }
-
-    .hubs-container {
-        grid-template-columns: repeat(4, 1fr);
-    }
-}
-
-@media (max-width: 768px) {
-    :root {
-        --card-width: 140px;
-        --card-height: 210px;
-    }
-
     .container {
         padding: 0 var(--spacing-md);
     }
 
-    .hubs-container {
-        grid-template-columns: repeat(3, 1fr);
-        gap: var(--spacing-sm);
-    }
-
-    .hub-item {
-        width: 80px;
-        height: 80px;
-    }
-
-    header .container {
-        gap: var(--spacing-md);
-        flex-wrap: wrap;
-    }
-
-    .main-nav {
-        display: none;
-    }
-
-    .main-nav.active {
-        display: flex;
-        position: absolute;
-        top: 60px;
-        left: 0;
-        right: 0;
-        background-color: rgba(0, 0, 0, 0.98);
-        flex-direction: column;
-        padding: var(--spacing-md);
-        z-index: 999;
-        border-bottom: 1px solid var(--color-border);
-    }
-
-    .menu-toggle {
-        display: flex;
-    }
-
-    .search-box {
-        width: 100%;
-        order: 3;
-        margin-top: 10px;
-    }
-
-    .user-actions {
-        flex-wrap: wrap;
-        justify-content: flex-end;
-    }
-
     .hero-banner {
-        height: 60vh;
+        height: 70vh;
+        /* Banner um pouco menor */
+        background-position: center center;
     }
 
     .hero-content h1 {
-        font-size: 2rem;
-    }
-
-    .hero-actions {
-        flex-direction: column;
-    }
-
-    .btn-play,
-    .btn-info,
-    .btn-trailer,
-    .btn-lista {
-        width: 100%;
-    }
-
-    .content-grid {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 10px;
-    }
-
-    .carousel-btn {
-        display: none;
-    }
-
-    .carousel-wrapper {
-        padding: 0;
-    }
-
-    .carousel {
-        padding: 20px 4%;
-    }
-
-    .content-section h2 {
-        margin-left: 0;
-        text-align: center;
-    }
-
-    .details-header {
-        height: 60vh;
+        font-size: 3rem;
     }
 
     .details-info {
-        align-items: center;
-        text-align: center;
-        padding-bottom: 40px;
+        flex-direction: column;
+        align-items: flex-start;
+        padding-top: 100px;
     }
 
     .details-poster {
         width: 180px;
         height: 270px;
-        margin-bottom: 25px;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+        margin-bottom: var(--spacing-lg);
+        align-self: flex-start;
+        /* Alinha poster à esquerda */
     }
 
-    .actions,
-    .meta-info {
+    .hubs-container {
+        grid-template-columns: repeat(4, 1fr);
+        /* Reduz colunas de marcas */
+        gap: 15px;
+    }
+}
+
+/* --- 2. DISPOSITIVOS MÓVEIS / TABLETS PORTRAIT (Max: 768px) --- */
+@media (max-width: 768px) {
+
+    /* >>> HEADER & NAVEGAÇÃO (Off-Canvas Menu) <<< */
+    header {
+        padding: 15px 0;
+        background: rgba(0, 0, 0, 0.95);
+        backdrop-filter: blur(10px);
+    }
+
+    .main-nav ul {
+        position: fixed;
+        top: 70px;
+        right: -100%;
+        width: 80%;
+        /* Menu ocupa 80% da tela */
+        max-width: 300px;
+        height: calc(100vh - 70px);
+        background: #141414;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start;
+        padding-top: 40px;
+        gap: 25px;
+        transition: right 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        border-left: 1px solid #333;
+        box-shadow: -10px 0 30px rgba(0, 0, 0, 0.8);
+        z-index: 999;
+    }
+
+    .main-nav ul.active {
+        right: 0;
+    }
+
+    .menu-toggle {
+        display: block;
+        /* Mostra ícone hamburguer */
+        z-index: 1001;
+    }
+
+    /* >>> HERO SECTION (BANNER) <<< */
+    .hero-banner {
+        height: 65vh;
+        align-items: flex-end;
+    }
+
+    .hero-content {
+        width: 100%;
+        text-align: center;
+        padding: 0 20px 40px;
+    }
+
+    .hero-content h1 {
+        font-size: 2.2rem;
+        text-shadow: 0 4px 15px rgba(0, 0, 0, 0.9);
+    }
+
+    .hero-content p {
+        display: none;
+        /* Esconde descrição longa no mobile para limpar visual */
+    }
+
+    .hero-actions {
         justify-content: center;
+        gap: 10px;
+    }
+
+    .btn-play,
+    .btn-info {
+        padding: 12px 20px;
+        width: 100%;
+        /* Botões full-width no mobile */
+        max-width: 280px;
+    }
+
+    /* >>> GRID E CONTEÚDO <<< */
+    .content-section h2 {
+        font-size: 1.4rem;
+        margin-left: 20px;
+        border-left: 4px solid var(--color-primary);
+        padding-left: 10px;
+    }
+
+    /* Transformar Grids em Scroll Horizontal (Estilo Nativo de App) */
+    .hubs-container {
+        display: flex;
+        overflow-x: auto;
+        padding: 20px;
+        gap: 15px;
+        grid-template-columns: none;
+        scroll-snap-type: x mandatory;
+    }
+
+    .hub-item {
+        min-width: 100px;
+        height: 100px;
+        scroll-snap-align: start;
+    }
+
+    /* >>> PERFIL DO USUÁRIO <<< */
+    .account-info-card {
+        width: 95%;
+        margin: 100px auto 40px;
+        padding: 30px 20px;
+        flex-direction: column;
+        /* Empilha foto e dados */
     }
 
     .card-content-wrapper {
@@ -1562,117 +1569,86 @@ body.light-mode .btn-lista {
 
     .profile-column {
         width: 100%;
-        border-bottom: 1px solid #333;
-        padding-bottom: 30px;
     }
 
     .data-column {
         width: 100%;
-        text-align: center;
+        text-align: left;
     }
 
-    .data-group {
-        align-items: center;
-    }
-
-    .data-group span {
-        text-align: center;
-    }
-
-    .btn-logout {
-        align-self: center;
-        width: 100%;
-    }
-
-    #content-grid,
-    #minha-lista-grid {
-        padding-top: 100px;
-    }
-
-    #content-grid h1 {
-        font-size: 1.8rem;
-        text-align: center;
-        padding-left: 0;
-    }
-
-    .player-controls {
-        flex-direction: column;
-        gap: 15px;
-    }
-
-    .control-section {
-        width: 100%;
-        justify-content: space-between;
-    }
-
-    .border-left {
-        border-left: none;
-        padding-left: 0;
-        border-top: 1px solid #333;
-        padding-top: 15px;
-    }
-
-    .btn-save {
-        width: 100%;
-        margin-left: 0;
-    }
-
-    .close-btn-custom {
-        top: -10px;
-        right: -10px;
-        width: 35px;
-        height: 35px;
-    }
-}
-
-@media (max-width: 480px) {
+    /* >>> AUTH / LOGIN <<< */
     .auth-box {
-        padding: 40px 25px;
-    }
-
-    .logo-auth {
-        font-size: 2rem;
+        padding: 30px 20px;
+        margin: 0 15px;
     }
 }
 
-@media (min-width: 1920px),
-(min-width: 1200px) and (min-height: 900px) {
-    html {
-        font-size: 20px;
+/* --- 3. CELULARES PEQUENOS (Max: 480px) --- */
+@media (max-width: 480px) {
+    h1 {
+        font-size: 1.8rem;
     }
 
-    /* Aumenta textos */
+    h2 {
+        font-size: 1.3rem;
+    }
+
+    .logo a {
+        font-size: 1.5rem;
+    }
+
+    .search-box input {
+        width: 120px;
+        /* Reduz busca para caber */
+    }
+
+    /* Botões da Hero ficam mais compactos */
+    .hero-actions {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .btn-play,
+    .btn-info {
+        width: 100%;
+        max-width: none;
+    }
+
+    /* Ajuste fino nos cards do carrossel */
+    .content-card {
+        min-width: 130px;
+        height: 200px;
+    }
+}
+
+/* --- 4. TELAS GIGANTES / TV (Min: 1920px) --- */
+@media (min-width: 1920px) {
+    :root {
+        --card-width: 280px;
+        --card-height: 420px;
+    }
 
     .container {
         max-width: 1800px;
     }
 
-    :root {
-        --card-width: 260px;
-        /* Cards maiores */
-        --card-height: 390px;
+    body {
+        font-size: 18px;
+        /* Aumenta legibilidade em telas grandes */
     }
+}
 
-    .hero-banner {
-        height: 85vh;
-    }
+/* =================================================================
+   UTILITÁRIOS GLOBAIS (FORA DO MEDIA QUERY)
+   ================================================================= */
+/* Esconder scrollbar mas manter funcionalidade */
+::-webkit-scrollbar {
+    width: 0px;
+    background: transparent;
+}
 
-    .hero-content {
-        max-width: 800px;
-    }
-
-    .hero-content h1 {
-        font-size: 4.5rem;
-    }
-
-    /* Borda de destaque para controle remoto */
-    a:focus,
-    button:focus,
-    .content-card:focus {
-        outline: 4px solid var(--color-primary);
-        transform: scale(1.1);
-        z-index: 999;
-    }
+html {
+    scrollbar-width: none;
 }
 
 /* --- TRANSIÇÃO CINEMATOGRÁFICA (Estilo Netflix) --- */
@@ -1689,7 +1665,7 @@ body.light-mode .btn-lista {
 /* 2. Define o "alvo" da transição na página de detalhes */
 .details-poster img {
     /* Este nome conecta com o javascript e faz a mágica */
-    view-transition-name: poster-morph; 
+    view-transition-name: poster-morph;
     contain: layout;
 }
 
@@ -1706,8 +1682,15 @@ body.light-mode .btn-lista {
 }
 
 @keyframes fadeUpText {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 /* --- CORREÇÃO DO PISCAR NO LOGIN --- */
@@ -1731,19 +1714,24 @@ body.light-mode .btn-lista {
 
 /* 1. Oculta a barra no Chrome, Edge, Safari, Opera */
 ::-webkit-scrollbar {
-    display: none !important; /* O comando mágico que apaga a barra */
+    display: none !important;
+    /* O comando mágico que apaga a barra */
 }
 
 /* 2. Oculta a barra no Firefox e IE */
-html, body {
-    scrollbar-width: none !important;    /* Firefox */
-    -ms-overflow-style: none !important; /* IE e Edge antigo */
-    
+html,
+body {
+    scrollbar-width: none !important;
+    /* Firefox */
+    -ms-overflow-style: none !important;
+    /* IE e Edge antigo */
+
     /* Garante a estrutura limpa */
     width: 100%;
     margin: 0;
     padding: 0;
-    overflow-x: hidden !important; /* Bloqueia rolagem lateral */
+    overflow-x: hidden !important;
+    /* Bloqueia rolagem lateral */
     background-color: var(--color-background-dark);
 }
 
@@ -1755,7 +1743,7 @@ footer {
        o width: 100% agora vai, de verdade, de ponta a ponta. */
     width: 100%;
     margin: 0;
-    
+
     /* Visual */
     background-color: #000000;
     border-top: 1px solid #333;
@@ -1763,4 +1751,3 @@ footer {
     text-align: center;
     margin-top: 80px;
 }
-
