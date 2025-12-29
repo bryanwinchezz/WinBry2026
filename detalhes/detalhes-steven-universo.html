@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>WinBry+ | Steven Universo</title>
+<link href="../../images/favicon.ico" rel="icon" type="image/x-icon"/>
+<link href="../principal/style.css" rel="stylesheet"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet"/>
+
+</head>
+<body class="dark-mode">
+<header>
+<div class="container">
+<div class="logo">
+<a class="btn-log" href="../principal/index.html">WinBry+</a>
+</div>
+<nav class="main-nav">
+<ul>
+<li><a href="../principal/index.html">Início</a></li>
+<li><a class="active" href="../principal/filmes.html">Filmes</a></li>
+<li><a href="../principal/series.html">Séries</a></li>
+<li><a href="../principal/animes.html">Animes</a></li>
+</ul>
+</nav>
+<div class="user-actions">
+<a class="icon-btn" id="theme-toggle"><i class="fas fa-sun"></i></a>
+<a class="icon-btn" href="../principal/formulario.html"><i class="fas fa-comments"></i></a>
+<a class="icon-btn" href="../principal/minha-lista.html"><i class="fas fa-bookmark"></i></a>
+<a class="btn btn-primary" href="../principal/login.html" id="user-action">Entrar</a>
+</div>
+<button class="menu-toggle"><i class="fas fa-bars"></i></button>
+</div>
+</header>
+<main>
+<section class="details-hero">
+<div class="hero-backdrop" style="background-image: url('../../images/posters/steven-universo.jpg')"></div>
+<div class="hero-overlay"></div>
+<div class="details-container">
+<img alt="Poster Steven Universo" class="details-poster" src="../../images/posters/steven-universo.jpg"/>
+<div class="details-info">
+<h1>Steven Universo</h1>
+<div class="details-meta">
+<span class="classificacao cl-livre">L</span>
+<span>•</span>
+<span>2024</span>
+<span>•</span>
+<span class="tag-hd">HD</span>
+<span>N/A</span>
+<span>Terror, Suspense</span>
+<span>•</span>
+<span>1h 40min</span>
+</div>
+<p class="details-description">Descrição não disponível.</p>
+<div class="details-actions">
+<button class="btn btn-play" data-video-url="#" id="btn-open-player">
+<i class="fas fa-play"></i> Assistir
+                        </button>
+<button class="btn btn-secondary btn-adicionar-lista" data-ano="2024" data-genero="Gênero" data-id="steven-universo" data-link="detalhes-steven-universo.html" data-poster="../images/posters/steven-universo.jpg" data-titulo="Steven Universo" id="btn-lista-toggle">
+<i class="fas fa-plus"></i> Minha Lista
+                        </button>
+<button class="btn btn-secondary" data-trailer-url="#" id="btn-trailer">
+<i class="fas fa-share-alt"></i> Trailer
+                        </button>
+</div>
+<div class="details-cast-section">
+<h3 style="margin-bottom: 15px; color: #aaa; font-size: 0.9rem; text-transform: uppercase;">
+                            Elenco Principal</h3>
+<div class="cast-list">
+<div class="cast-member">
+<img alt="Ator 1" class="cast-avatar" src="https://i.pravatar.cc/150?img=12"/>
+<div class="cast-name">Liam Miller</div>
+</div>
+<div class="cast-member">
+<img alt="Atriz 1" class="cast-avatar" src="https://i.pravatar.cc/150?img=5"/>
+<div class="cast-name">Emma Stone</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section class="content-section">
+<div class="container">
+<h2 style="margin-bottom: 20px; border-left: 4px solid #fff; padding-left: 10px;">Recomendados para você
+                </h2>
+<div class="content-grid">
+<a class="content-card" href="detalhes-until-dawn.html">
+<img alt="Poster" src="../../images/posters/until-dawn.jpg"/>
+<div class="card-info">
+<h3>Until Dawn</h3>
+<p>2025 • Terror</p>
+</div>
+</a>
+</div>
+</div>
+</section>
+</main>
+<div class="video-modal-overlay" id="video-modal">
+<div class="video-modal-content">
+<button class="close-modal-btn" id="close-player"><i class="fas fa-times"></i> Fechar</button>
+<iframe allowfullscreen="" frameborder="0" id="video-iframe" scrolling="no" src=""></iframe>
+</div>
+</div>
+<div id="toast"></div>
+<footer>
+<div class="container">
+<p>© 2025 WinBry+ | Todos os direitos reservados.</p>
+</div>
+</footer>
+<script src="../principal/script.js"></script>
+</body>
+</html>
