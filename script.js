@@ -44,32 +44,33 @@ document.addEventListener('DOMContentLoaded', () => {
     initSearch();
     initVideoModal();
 
-    // ROTEAMENTO DE PÁGINAS
+    // ROTEAMENTO DE PÁGINAS (Corrigido para Netlify)
     const path = window.location.pathname;
     const urlParams = new URLSearchParams(window.location.search);
     const isGlobalSearch = urlParams.get('global') === 'true';
 
     // Roteamento Lógico
-    if (path.includes('index.html') || path.endsWith('/') || path.endsWith('principal/')) {
+    // Verifica se é Home
+    if (path.endsWith('/') || path.includes('index') || path.includes('principal')) {
         initHomePage();
     }
-    else if (path.includes('filmes.html')) {
-        // Verifica se é busca global ou listagem normal
+    // Verifica apenas a palavra-chave (sem .html)
+    else if (path.includes('filmes')) {
         isGlobalSearch ? initContentPage('todos', 'Resultados da Busca') : initContentPage('filme', 'Filmes');
     }
-    else if (path.includes('series.html')) {
+    else if (path.includes('series')) {
         initContentPage('serie', 'Séries');
     }
-    else if (path.includes('animes.html')) {
+    else if (path.includes('animes')) {
         initContentPage('anime', 'Animes');
     }
-    else if (path.includes('minha-lista.html')) {
+    else if (path.includes('minha-lista')) { // <-- Agora funciona no Netlify
         initMinhaLista();
     }
-    else if (path.includes('detalhes.html')) {
+    else if (path.includes('detalhes')) {
         initDetalhesPage();
     }
-    else if (path.includes('minha-conta.html')) {
+    else if (path.includes('minha-conta')) {
         initMinhaConta();
     }
 
