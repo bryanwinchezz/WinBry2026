@@ -1,10 +1,15 @@
 // =================================================================================
-// SCRIPT.JS - VERSÃO STARK TECH (CORRIGIDO)
+// SCRIPT.JS - VERSÃO STARK TECH (PILOTO AUTOMÁTICO)
 // =================================================================================
 
 // --- SISTEMA DE BANCO DE DADOS SIMULADO ---
 function getActiveUser() {
-    return JSON.parse(localStorage.getItem('winbry_active_session'));
+    try {
+        const session = localStorage.getItem('winbry_active_session');
+        return session ? JSON.parse(session) : null;
+    } catch (e) {
+        return null;
+    }
 }
 
 function updateActiveUser(userData) {
@@ -19,61 +24,81 @@ function updateActiveUser(userData) {
 }
 
 // =================================================================
-// INICIALIZAÇÃO
+// INICIALIZAÇÃO & ROTEAMENTO AUTOMÁTICO
 // =================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("Sistema WinBry+ Iniciado (Multi-Conta).");
+    console.log("Sistema WinBry+ Iniciado (Modo Automático).");
 
-    // Verificação de Segurança (Data.js)
-    if (typeof conteudos === 'undefined') {
-        console.error("ERRO CRÍTICO: Banco de dados (data.js) não encontrado ou carregado depois do script.js.");
-        // Opcional: Mostrar alerta na tela
-        // alert("Erro: data.js não carregado. Verifique o console.");
-    }
-
+    // 1. Inicializa componentes globais (Menu, Header, Busca)
+    if (typeof conteudos === 'undefined') console.error("ERRO: data.js não carregado.");
+    
     initTheme();
     initMenuMobile();
     initHeaderUser();
+    initSearch();
+    initVideoModal();
+    initTransitionManager();
 
     setTimeout(() => {
         const userActions = document.querySelector('.user-actions');
         if (userActions) userActions.classList.add('auth-loaded');
     }, 50);
 
-    initSearch();
-    initVideoModal();
-
-    // ROTEAMENTO DE PÁGINAS
-    const path = window.location.pathname;
+    // 2. DETECTOR DE PÁGINA (O CÉREBRO DO SISTEMA)
+    // Ele verifica a URL e decide qual função rodar automaticamente.
+    const path = window.location.pathname.toLowerCase();
+    const href = window.location.href.toLowerCase();
+    
+    // Verifica se é busca global (parâmetro na URL)
     const urlParams = new URLSearchParams(window.location.search);
     const isGlobalSearch = urlParams.get('global') === 'true';
 
-    // Roteamento Lógico
-    if (path.includes('index.html') || path.endsWith('/') || path.endsWith('principal/')) {
-        initHomePage();
+    // LÓGICA DE DECISÃO:
+    
+    // > HOME (Se for raiz, index.html ou pasta principal)
+    if (path === '/' || path.endsWith('/') || path.includes('index') || path.includes('principal') && !path.includes('.html')) {
+        // Confirmação extra: Se tiver o banner principal, é a Home
+        if (document.querySelector('.hero-banner')) {
+            initHomePage();
+        }
     }
-    else if (path.includes('filmes.html')) {
-        // Verifica se é busca global ou listagem normal
-        isGlobalSearch ? initContentPage('todos', 'Resultados da Busca') : initContentPage('filme', 'Filmes');
+    
+    // > FILMES (Detecta 'filmes' na URL, com ou sem .html)
+    else if (path.includes('filmes')) {
+        if (isGlobalSearch) {
+            initContentPage('todos', 'Resultados da Busca');
+        } else {
+            initContentPage('filme', 'Filmes');
+        }
     }
-    else if (path.includes('series.html')) {
+    
+    // > SÉRIES
+    else if (path.includes('series')) {
         initContentPage('serie', 'Séries');
     }
-    else if (path.includes('animes.html')) {
+    
+    // > ANIMES
+    else if (path.includes('animes')) {
         initContentPage('anime', 'Animes');
     }
-    else if (path.includes('minha-lista.html')) {
+    
+    // > MINHA LISTA
+    else if (path.includes('minha-lista') || path.includes('lista')) {
         initMinhaLista();
     }
-    else if (path.includes('detalhes.html')) {
+    
+    // > DETALHES
+    else if (path.includes('detalhes')) {
         initDetalhesPage();
     }
-    else if (path.includes('minha-conta.html')) {
+    
+    // > MINHA CONTA
+    else if (path.includes('minha-conta') || path.includes('perfil')) {
         initMinhaConta();
     }
 
-    // Formulários
+    // > LOGIN E CADASTRO (Inicializa forms se existirem)
     const cadastroForm = document.getElementById("cadastroForm");
     if (cadastroForm) initCadastro(cadastroForm);
 
@@ -82,9 +107,279 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // =================================================================
-// SISTEMA DE CONTA (LOGIN, CADASTRO, PERFIL)
+// FUNÇÕES DAS PÁGINAS (HOME, LISTAS, DETALHES...)
 // =================================================================
 
+function initHomePage() {
+    if (typeof conteudos === 'undefined') return;
+
+    const sectionHistory = document.getElementById('continue-watching-section');
+    const user = getActiveUser();
+    const historicoData = user ? (user.watchHistory || []) : [];
+
+    // Mapeia histórico
+    const listaHistorico = historicoData
+        .map(h => {
+            const filme = conteudos.find(c => c.id === h.id);
+            if (filme) {
+                return {
+                    ...filme,
+                    progressoReal: h.progresso,
+                    savedSeason: h.temporada,
+                    savedEpisode: h.episodio,
+                    savedHour: h.horaParada,
+                    savedMin: h.minutoParada
+                };
+            }
+            return null;
+        })
+        .filter(item => item !== null);
+
+    if (listaHistorico.length > 0 && sectionHistory) {
+        sectionHistory.style.display = 'block';
+        renderCarousel('continue-watching-section', 'Continuar Assistindo', listaHistorico, true);
+    } else if (sectionHistory) {
+        sectionHistory.style.display = 'none';
+    }
+
+    const filmes = searchContent('', 'filme');
+    const series = searchContent('', 'serie');
+    const animes = searchContent('', 'anime');
+
+    renderCarousel('filmes-populares-section', 'Filmes Populares', filmes.slice(0, 12));
+    renderCarousel('series-em-alta-section', 'Séries em Alta', series.slice(0, 12));
+    renderCarousel('animes-recomendados-section', 'Animes Recomendados', animes.slice(0, 12));
+
+    const btnHero = document.getElementById('btn-open-player');
+    if (btnHero) {
+        const idHero = btnHero.getAttribute('data-id');
+        btnHero.addEventListener('click', function () {
+            window.openVideoModal(this.getAttribute('data-video-url'), idHero);
+        });
+    }
+}
+
+function initContentPage(tipo, tituloPadrao) {
+    const container = document.getElementById('content-grid');
+    if (!container) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const search = params.get('search');
+    
+    const lista = searchContent(search || '', tipo);
+    const titulo = search ? `Resultados para: "${search}"` : tituloPadrao;
+
+    let html = `<h1>${titulo}</h1><div class="content-grid">`;
+    if (lista.length === 0) {
+        html += `<div class="empty-message" style="width:100%;text-align:center;">Nenhum conteúdo encontrado.</div>`;
+    } else {
+        lista.forEach(item => html += createContentCard(item));
+    }
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function initDetalhesPage() {
+    const id = new URLSearchParams(window.location.search).get('id');
+    const item = getContentById(id);
+    const container = document.getElementById('details-container'); // Busca pelo ID específico agora
+
+    // Se não achar o container específico, tenta o main (fallback)
+    const target = container || document.querySelector('main');
+
+    if (!item) {
+        if(target) target.innerHTML = '<div class="container" style="padding-top:150px;text-align:center;"><h1>Conteúdo não encontrado.</h1><a href="index.html" class="btn btn-primary">Voltar</a></div>';
+        return;
+    }
+
+    document.title = `WinBry+ | ${item.titulo}`;
+    const bg = `background-image: url('${item.banner}');`;
+
+    const corClass = item.classificacaoNum >= 18 ? '#000000' :
+        item.classificacaoNum >= 16 ? '#db0000' :
+            item.classificacaoNum >= 14 ? '#e67e22' :
+                item.classificacaoNum >= 12 ? '#f1c40f' : '#2ecc71';
+
+    const estrelasHTML = gerarEstrelasHTML(item.popularidade);
+
+    // Renderiza
+    const htmlContent = `
+        <div class="details-header" style="${bg}">
+            <div class="overlay"></div>
+            <div class="details-info container">
+                <div class="details-poster">
+                    <img src="${item.poster}" alt="${item.titulo}">
+                </div>
+                <div class="info-text">
+                    <h1>${item.titulo}</h1>
+                    ${estrelasHTML}
+                    <div class="meta-info">
+                        <span class="classificacao" style="background:${corClass}">${item.classificacao}</span>
+                        <span>${item.ano}</span>
+                        <span>${item.duracao}</span>
+                        <span class="qualidade">${item.qualidade}</span>
+                    </div>
+                    <p>${item.sinopse}</p>
+                    <div class="actions">
+                        <button class="btn btn-play" onclick="window.openVideoModal('${item.videoUrl}', '${item.id}')"><i class="fas fa-play"></i> Assistir</button>
+                        <button class="btn btn-trailer" onclick="window.openVideoModal('${item.trailerUrl}')"><i class="fas fa-film"></i> Trailer</button>
+                        <button class="btn btn-lista" id="btn-add-lista" data-id="${item.id}"><i class="fas fa-bookmark"></i> Minha Lista</button>
+                    </div>
+                    <div class="elenco"><strong>Elenco:</strong> ${item.elenco.join(', ')}</div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    if(target) target.innerHTML = htmlContent;
+
+    const btnLista = document.getElementById('btn-add-lista');
+    if (btnLista) {
+        updateListaButton(btnLista, item);
+        btnLista.addEventListener('click', () => toggleMinhaLista(item, btnLista));
+    }
+}
+
+function initMinhaLista() {
+    const grid = document.getElementById('lista-container');
+    if (!grid) return;
+
+    const user = getActiveUser();
+
+    if (!user) {
+        grid.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-lock" style="font-size: 3rem; margin-bottom: 20px; color: var(--color-text-secondary);"></i>
+                <h3>Faça login para ver sua lista</h3>
+                <a href="login.html" class="btn btn-primary" style="margin-top: 20px;">Entrar Agora</a>
+            </div>`;
+        return;
+    }
+
+    const lista = user.minhaLista || [];
+
+    if (lista.length === 0) {
+        grid.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-bookmark" style="font-size: 3rem; margin-bottom: 20px; color: var(--color-text-secondary);"></i>
+                <h3>Sua lista está vazia</h3>
+                <p>Adicione filmes e séries para assistir mais tarde.</p>
+                <a href="index.html" class="btn btn-secondary" style="margin-top: 20px;">Explorar Conteúdo</a>
+            </div>`;
+        return;
+    }
+
+    renderizarGridLista(lista, grid);
+    
+    // Busca na lista
+    const searchInput = document.getElementById('search-input');
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            const termo = e.target.value.toLowerCase();
+            const listaFiltrada = lista.filter(item => item.titulo.toLowerCase().includes(termo));
+            renderizarGridLista(listaFiltrada, grid);
+        });
+    }
+}
+
+// =================================================================
+// FUNÇÕES AUXILIARES, CARROSSEL E HELPERS
+// =================================================================
+
+function renderCarousel(sectionId, title, list, isHistory = false) {
+    const section = document.getElementById(sectionId);
+    if (!section) return;
+
+    const container = section.querySelector('.container');
+    container.innerHTML = `<h2>${title}</h2>`;
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'carousel-wrapper';
+
+    const carousel = document.createElement('div');
+    carousel.className = 'carousel';
+
+    if (list.length === 0) {
+        carousel.innerHTML = '<p class="empty-message">Em breve.</p>';
+    } else {
+        carousel.innerHTML = list.map(item => createContentCard(item, isHistory)).join('');
+    }
+
+    const btnPrev = document.createElement('button');
+    btnPrev.className = 'carousel-btn prev';
+    btnPrev.innerHTML = '<i class="fas fa-chevron-left"></i>';
+    btnPrev.onclick = () => carousel.scrollBy({ left: -300, behavior: 'smooth' });
+
+    const btnNext = document.createElement('button');
+    btnNext.className = 'carousel-btn next';
+    btnNext.innerHTML = '<i class="fas fa-chevron-right"></i>';
+    btnNext.onclick = () => carousel.scrollBy({ left: 300, behavior: 'smooth' });
+
+    wrapper.append(btnPrev, carousel, btnNext);
+    container.appendChild(wrapper);
+}
+
+function createContentCard(item, isHistory = false) {
+    let overlayHTML = '';
+
+    if (isHistory) {
+        let tempoTexto = '';
+        if (item.savedHour > 0) tempoTexto += `${item.savedHour}h `;
+        if (item.savedMin >= 0) tempoTexto += `${item.savedMin}m`;
+        
+        if (item.savedSeason && item.savedEpisode) {
+            overlayHTML = `
+                <div class="episode-badge">T${item.savedSeason}:E${item.savedEpisode}</div>
+                <div class="progress-container"><div class="progress-bar-fill" style="width: ${item.progressoReal || 5}%"></div></div>
+            `;
+        }
+        else if (item.progressoReal !== undefined) {
+            overlayHTML = `
+                <div class="episode-badge" style="justify-content: center;">
+                    <span class="badge-time" style="color:#fff; margin:0;">${tempoTexto}</span>
+                </div>
+                <div class="progress-container"><div class="progress-bar-fill" style="width: ${item.progressoReal || 5}%"></div></div>
+            `;
+        }
+    }
+
+    return `
+        <a href="detalhes.html?id=${item.id}" class="content-card">
+            <img src="${item.poster}" alt="${item.titulo}" loading="lazy">
+            ${overlayHTML}
+            <div class="card-info">
+                <h3>${item.titulo}</h3>
+                <p>${item.ano}</p>
+            </div>
+        </a>
+    `;
+}
+
+function renderizarGridLista(lista, container) {
+    if (lista.length === 0) {
+        container.innerHTML = '<p class="empty-message">Nenhum título encontrado na sua lista.</p>';
+        return;
+    }
+
+    let html = '';
+    lista.forEach(item => {
+        html += `
+            <div class="content-card-wrapper" style="position: relative;">
+                <a href="detalhes.html?id=${item.id}" class="content-card">
+                    <img src="${item.poster}" alt="${item.titulo}" loading="lazy">
+                    <div class="card-info">
+                        <h3>${item.titulo}</h3>
+                        <p>${item.ano}</p>
+                    </div>
+                </a>
+                <button class="btn-remove-lista" onclick="removerItemLista('${item.id}')"><i class="fas fa-trash"></i> Remover</button>
+            </div>
+        `;
+    });
+    container.innerHTML = html;
+}
+
+// --- SISTEMA DE CADASTRO E LOGIN ---
 function initCadastro(form) {
     form.addEventListener('submit', (e) => {
         e.preventDefault();
@@ -153,7 +448,7 @@ function initMinhaConta() {
         window.location.href = 'login.html';
         return;
     }
-
+    // Lógica simples de preencher perfil
     const elUsername = document.getElementById('display-username');
     const elEmail = document.getElementById('display-email');
     const elImg = document.getElementById('profile-pic');
@@ -168,12 +463,6 @@ function initMinhaConta() {
         elInput.addEventListener('change', function (e) {
             const file = e.target.files[0];
             if (!file) return;
-
-            if (file.size > 0.5 * 1024 * 1024) {
-                showToast("Imagem muito grande! Use uma menor que 500KB.", "error");
-                return;
-            }
-
             const reader = new FileReader();
             reader.onload = function (readerEvent) {
                 const base64String = readerEvent.target.result;
@@ -187,9 +476,7 @@ function initMinhaConta() {
         });
     }
 
-    if (btnLogout) {
-        btnLogout.onclick = (e) => { e.preventDefault(); logout(); };
-    }
+    if (btnLogout) btnLogout.onclick = (e) => { e.preventDefault(); logout(); };
 }
 
 function initHeaderUser() {
@@ -215,28 +502,19 @@ function initHeaderUser() {
     }
 }
 
-// =================================================================
-// LÓGICA DE DADOS E BUSCA (CORRIGIDA PARA ACENTOS)
-// =================================================================
-
+// --- BUSCA E HELPERS ---
 function searchContent(termo, tipo = 'todos') {
     if (typeof conteudos === 'undefined') return [];
-    
     const termoNorm = termo.toLowerCase().trim();
-    // Normaliza o tipo para garantir (ex: 'Série' vira 'série')
     const tipoNorm = tipo.toLowerCase().trim();
 
     return conteudos.filter(item => {
         const itemTipo = item.tipo ? item.tipo.toLowerCase() : '';
-        
-        // Verifica se o tipo bate (considerando que no data.js pode estar 'serie' ou 'filme')
         const tipoMatch = tipoNorm === 'todos' || itemTipo === tipoNorm;
-        
         const termoMatch = !termoNorm ||
             item.titulo.toLowerCase().includes(termoNorm) ||
             (item.categoria && item.categoria.toLowerCase().includes(termoNorm)) ||
             item.genero.toLowerCase().includes(termoNorm);
-            
         return tipoMatch && termoMatch;
     });
 }
@@ -246,23 +524,16 @@ function getContentById(id) {
     return conteudos.find(item => item.id === id);
 }
 
-// =================================================================
-// UI HELPERS
-// =================================================================
-
 function showToast(message, type = 'info') {
     const existingToast = document.getElementById('active-toast');
     if (existingToast) existingToast.remove();
-
     const toast = document.createElement('div');
     toast.id = 'active-toast';
     toast.classList.add('toast', type);
     toast.textContent = message;
-
     document.body.appendChild(toast);
-    void toast.offsetWidth; // Força reflow
+    void toast.offsetWidth;
     toast.classList.add('show');
-
     setTimeout(() => {
         toast.classList.remove('show');
         setTimeout(() => toast.remove(), 300);
@@ -273,12 +544,10 @@ function initTheme() {
     const toggle = document.getElementById('theme-toggle');
     if (!toggle) return;
     const icon = toggle.querySelector('i');
-
     if (localStorage.getItem('theme') === 'light') {
         document.body.classList.add('light-mode');
         if (icon) icon.className = 'fas fa-moon';
     }
-
     toggle.addEventListener('click', () => {
         document.body.classList.toggle('light-mode');
         const isLight = document.body.classList.contains('light-mode');
@@ -313,409 +582,29 @@ function initSearch() {
     const go = () => {
         const val = input.value.trim();
         if (!val) return;
-        const path = window.location.pathname;
-
-        // Redirecionamento inteligente baseado na página atual
-        if (path.includes('series.html')) {
-            window.location.href = `series.html?search=${encodeURIComponent(val)}`;
-        } else if (path.includes('animes.html')) {
-            window.location.href = `animes.html?search=${encodeURIComponent(val)}`;
-        } else if (path.includes('filmes.html') && !new URLSearchParams(window.location.search).get('global')) {
+        const path = window.location.pathname.toLowerCase();
+        
+        if (path.includes('series')) window.location.href = `series.html?search=${encodeURIComponent(val)}`;
+        else if (path.includes('animes')) window.location.href = `animes.html?search=${encodeURIComponent(val)}`;
+        else if (path.includes('filmes') && !new URLSearchParams(window.location.search).get('global')) {
             window.location.href = `filmes.html?search=${encodeURIComponent(val)}`;
         } else {
-            // Se estiver na Home, tenta adivinhar o contexto ou manda para busca global
+            // Lógica global
             const resultados = searchContent(val, 'todos');
             const tipos = [...new Set(resultados.map(i => i.tipo))];
-            
-            if (tipos.length === 1 && tipos[0] === 'anime') {
-                window.location.href = `animes.html?search=${encodeURIComponent(val)}`;
-            } else if (tipos.length === 1 && tipos[0] === 'serie') {
-                window.location.href = `series.html?search=${encodeURIComponent(val)}`;
-            } else {
-                window.location.href = `filmes.html?search=${encodeURIComponent(val)}&global=true`;
-            }
+            if (tipos.length === 1 && tipos[0] === 'anime') window.location.href = `animes.html?search=${encodeURIComponent(val)}`;
+            else if (tipos.length === 1 && tipos[0] === 'serie') window.location.href = `series.html?search=${encodeURIComponent(val)}`;
+            else window.location.href = `filmes.html?search=${encodeURIComponent(val)}&global=true`;
         }
     };
     btn.addEventListener('click', go);
     input.addEventListener('keypress', (e) => { if (e.key === 'Enter') go(); });
 }
 
-// =================================================================
-// PÁGINA HOME & CARROSSEL
-// =================================================================
-
-function initHomePage() {
-    if (typeof conteudos === 'undefined') return;
-
-    const sectionHistory = document.getElementById('continue-watching-section');
-    const user = getActiveUser();
-    const historicoData = user ? (user.watchHistory || []) : [];
-
-    // Mapeia histórico
-    const listaHistorico = historicoData
-        .map(h => {
-            const filme = conteudos.find(c => c.id === h.id);
-            if (filme) {
-                return {
-                    ...filme,
-                    progressoReal: h.progresso,
-                    savedSeason: h.temporada,
-                    savedEpisode: h.episodio,
-                    savedHour: h.horaParada,
-                    savedMin: h.minutoParada
-                };
-            }
-            return null;
-        })
-        .filter(item => item !== null);
-
-    if (listaHistorico.length > 0 && sectionHistory) {
-        sectionHistory.style.display = 'block';
-        renderCarousel('continue-watching-section', 'Continuar Assistindo', listaHistorico, true);
-    } else if (sectionHistory) {
-        sectionHistory.style.display = 'none';
-    }
-
-    const filmes = searchContent('', 'filme');
-    const series = searchContent('', 'serie');
-    const animes = searchContent('', 'anime');
-
-    renderCarousel('filmes-populares-section', 'Filmes Populares', filmes.slice(0, 12));
-    renderCarousel('series-em-alta-section', 'Séries em Alta', series.slice(0, 12));
-    renderCarousel('animes-recomendados-section', 'Animes Recomendados', animes.slice(0, 12));
-
-    const btnHero = document.getElementById('btn-open-player');
-    if (btnHero) {
-        const idHero = btnHero.getAttribute('data-id');
-        btnHero.addEventListener('click', function () {
-            window.openVideoModal(this.getAttribute('data-video-url'), idHero);
-        });
-    }
-}
-
-function renderCarousel(sectionId, title, list, isHistory = false) {
-    const section = document.getElementById(sectionId);
-    if (!section) return;
-
-    const container = section.querySelector('.container');
-    container.innerHTML = `<h2>${title}</h2>`;
-
-    const wrapper = document.createElement('div');
-    wrapper.className = 'carousel-wrapper';
-
-    const carousel = document.createElement('div');
-    carousel.className = 'carousel';
-
-    if (list.length === 0) {
-        carousel.innerHTML = '<p class="empty-message">Em breve.</p>';
-    } else {
-        // Concatenando HTML de forma eficiente
-        carousel.innerHTML = list.map(item => createContentCard(item, isHistory)).join('');
-    }
-
-    const btnPrev = document.createElement('button');
-    btnPrev.className = 'carousel-btn prev';
-    btnPrev.innerHTML = '<i class="fas fa-chevron-left"></i>';
-    btnPrev.onclick = () => carousel.scrollBy({ left: -300, behavior: 'smooth' });
-
-    const btnNext = document.createElement('button');
-    btnNext.className = 'carousel-btn next';
-    btnNext.innerHTML = '<i class="fas fa-chevron-right"></i>';
-    btnNext.onclick = () => carousel.scrollBy({ left: 300, behavior: 'smooth' });
-
-    wrapper.append(btnPrev, carousel, btnNext);
-    container.appendChild(wrapper);
-}
-
-function createContentCard(item, isHistory = false) {
-    let overlayHTML = '';
-
-    if (isHistory) {
-        let tempoTexto = '';
-        if (item.savedHour > 0) tempoTexto += `${item.savedHour}h `;
-        if (item.savedMin >= 0) tempoTexto += `${item.savedMin}m`;
-        
-        if (item.savedSeason && item.savedEpisode) {
-            overlayHTML = `
-                <div class="episode-badge">
-                    T${item.savedSeason}:E${item.savedEpisode}
-                </div>
-                <div class="progress-container"><div class="progress-bar-fill" style="width: ${item.progressoReal || 5}%"></div></div>
-            `;
-        }
-        else if (item.progressoReal !== undefined) {
-            overlayHTML = `
-                <div class="episode-badge" style="justify-content: center;">
-                    <span class="badge-time" style="color:#fff; margin:0;">${tempoTexto}</span>
-                </div>
-                <div class="progress-container">
-                    <div class="progress-bar-fill" style="width: ${item.progressoReal || 5}%"></div>
-                </div>
-            `;
-        }
-    }
-
-    return `
-        <a href="detalhes.html?id=${item.id}" class="content-card" onclick="event.preventDefault(); window.location.href='detalhes.html?id=${item.id}'">
-            <img src="${item.poster}" alt="${item.titulo}" loading="lazy">
-            ${overlayHTML}
-            <div class="card-info">
-                <h3>${item.titulo}</h3>
-                <p>${item.ano}</p>
-            </div>
-        </a>
-    `;
-}
-
-// =================================================================
-// PÁGINA DE LISTAGEM (Filmes/Séries/Animes)
-// =================================================================
-
-function initContentPage(tipo, tituloPadrao) {
-    const container = document.getElementById('content-grid');
-    if (!container) {
-        console.error(`Erro: Elemento #content-grid não encontrado na página ${window.location.pathname}`);
-        return;
-    }
-
-    const params = new URLSearchParams(window.location.search);
-    const search = params.get('search');
-    
-    // Busca conteúdo
-    const lista = searchContent(search || '', tipo);
-    const titulo = search ? `Resultados para: "${search}"` : tituloPadrao;
-
-    let html = `<h1>${titulo}</h1><div class="content-grid">`;
-    if (lista.length === 0) {
-        // Mensagem de erro amigável se o banco estiver vazio
-        if (typeof conteudos === 'undefined') {
-            html += `<div class="empty-message" style="width:100%;text-align:center;color:red;">Erro: Banco de Dados não carregado.</div>`;
-        } else {
-            html += `<div class="empty-message" style="width:100%;text-align:center;">Nenhum conteúdo encontrado.</div>`;
-        }
-    } else {
-        lista.forEach(item => html += createContentCard(item));
-    }
-    html += '</div>';
-    container.innerHTML = html;
-}
-
-// =================================================================
-// PÁGINA DETALHES
-// =================================================================
-
-function initDetalhesPage() {
-    const id = new URLSearchParams(window.location.search).get('id');
-    const item = getContentById(id);
-    const container = document.querySelector('main');
-
-    if (!item) {
-        container.innerHTML = '<div class="container" style="padding-top:150px;text-align:center;"><h1>Conteúdo não encontrado.</h1><a href="index.html" class="btn btn-primary">Voltar</a></div>';
-        return;
-    }
-
-    document.title = `WinBry+ | ${item.titulo}`;
-    const bg = `background-image: url('${item.banner}');`;
-
-    const corClass = item.classificacaoNum >= 18 ? '#000000' :
-        item.classificacaoNum >= 16 ? '#db0000' :
-            item.classificacaoNum >= 14 ? '#e67e22' :
-                item.classificacaoNum >= 12 ? '#f1c40f' :
-                    item.classificacaoNum >= 10 ? '#0099ff' :
-                        '#2ecc71';
-
-    const estrelasHTML = gerarEstrelasHTML(item.popularidade);
-
-    container.innerHTML = `
-        <div class="details-header" style="${bg}">
-            <div class="overlay"></div>
-            <div class="details-info container">
-                <div class="details-poster">
-                    <img src="${item.poster}" alt="${item.titulo}">
-                </div>
-                <div class="info-text">
-                    <h1>${item.titulo}</h1>
-                    ${estrelasHTML}
-                    <div class="meta-info">
-                        <span class="classificacao" style="background:${corClass}">${item.classificacao}</span>
-                        <span>${item.ano}</span>
-                        <span>${item.duracao}</span>
-                        <span class="qualidade">${item.qualidade}</span>
-                    </div>
-                    <p>${item.sinopse}</p>
-                    <div class="actions">
-                        <button class="btn btn-play" onclick="window.openVideoModal('${item.videoUrl}', '${item.id}')"><i class="fas fa-play"></i> Assistir</button>
-                        <button class="btn btn-trailer" onclick="window.openVideoModal('${item.trailerUrl}')"><i class="fas fa-film"></i> Trailer</button>
-                        <button class="btn btn-lista" id="btn-add-lista" data-id="${item.id}"><i class="fas fa-bookmark"></i> Minha Lista</button>
-                    </div>
-                    <div class="elenco"><strong>Elenco:</strong> ${item.elenco.join(', ')}</div>
-                </div>
-            </div>
-        </div>
-    `;
-
-    const btnLista = document.getElementById('btn-add-lista');
-    if (btnLista) {
-        updateListaButton(btnLista, item);
-        btnLista.addEventListener('click', () => toggleMinhaLista(item, btnLista));
-    }
-}
-
-// =================================================================
-// MINHA LISTA
-// =================================================================
-
-function updateListaButton(btn, item) {
-    const user = getActiveUser();
-    if (!user) {
-        btn.innerHTML = '<i class="fas fa-bookmark"></i> Minha Lista';
-        btn.classList.remove('active');
-        return;
-    }
-
-    const minhaLista = user.minhaLista || [];
-    const exists = minhaLista.some(i => i.id === item.id);
-
-    if (exists) {
-        btn.innerHTML = '<i class="fas fa-check"></i> Na Lista';
-        btn.classList.add('active');
-    } else {
-        btn.innerHTML = '<i class="fas fa-bookmark"></i> Minha Lista';
-        btn.classList.remove('active');
-    }
-}
-
-function toggleMinhaLista(item, btn) {
-    const user = getActiveUser();
-    if (!user) {
-        showToast("Faça login para salvar.", "error");
-        setTimeout(() => window.location.href = 'login.html', 1500);
-        return;
-    }
-
-    if (!user.minhaLista) user.minhaLista = [];
-    const index = user.minhaLista.findIndex(i => i.id === item.id);
-
-    if (index !== -1) {
-        user.minhaLista.splice(index, 1);
-        showToast("Removido da Minha Lista.", "info");
-        if (btn) {
-            btn.innerHTML = '<i class="fas fa-bookmark"></i> Minha Lista';
-            btn.classList.remove('active');
-        }
-    } else {
-        user.minhaLista.push({
-            id: item.id,
-            titulo: item.titulo,
-            poster: item.poster,
-            ano: item.ano,
-            tipo: item.tipo
-        });
-        showToast("Adicionado à Minha Lista!", "success");
-        if (btn) {
-            btn.innerHTML = '<i class="fas fa-check"></i> Salvo';
-            btn.classList.add('active');
-        }
-    }
-    updateActiveUser(user);
-}
-
-function initMinhaLista() {
-    const grid = document.getElementById('lista-container');
-    if (!grid) {
-        console.error("Erro: #lista-container não encontrado em minha-lista.html");
-        return;
-    }
-
-    const user = getActiveUser();
-
-    if (!user) {
-        grid.innerHTML = `
-            <div class="empty-state">
-                <i class="fas fa-lock" style="font-size: 3rem; margin-bottom: 20px; color: var(--color-text-secondary);"></i>
-                <h3>Faça login para ver sua lista</h3>
-                <a href="login.html" class="btn btn-primary" style="margin-top: 20px;">Entrar Agora</a>
-            </div>`;
-        return;
-    }
-
-    const lista = user.minhaLista || [];
-
-    if (lista.length === 0) {
-        grid.innerHTML = `
-            <div class="empty-state">
-                <i class="fas fa-bookmark" style="font-size: 3rem; margin-bottom: 20px; color: var(--color-text-secondary);"></i>
-                <h3>Sua lista está vazia</h3>
-                <p>Adicione filmes e séries para assistir mais tarde.</p>
-                <a href="index.html" class="btn btn-secondary" style="margin-top: 20px;">Explorar Conteúdo</a>
-            </div>`;
-        return;
-    }
-
-    renderizarGridLista(lista, grid);
-
-    const searchInput = document.getElementById('search-input');
-    if (searchInput) {
-        searchInput.addEventListener('input', (e) => {
-            const termo = e.target.value.toLowerCase();
-            const listaFiltrada = lista.filter(item =>
-                item.titulo.toLowerCase().includes(termo)
-            );
-            renderizarGridLista(listaFiltrada, grid);
-        });
-    }
-}
-
-function renderizarGridLista(lista, container) {
-    if (lista.length === 0) {
-        container.innerHTML = '<p class="empty-message">Nenhum título encontrado na sua lista.</p>';
-        return;
-    }
-
-    let html = '';
-    lista.forEach(item => {
-        html += `
-            <div class="content-card-wrapper" style="position: relative;">
-                <a href="detalhes.html?id=${item.id}" class="content-card">
-                    <img src="${item.poster}" alt="${item.titulo}" loading="lazy">
-                    <div class="card-info">
-                        <h3>${item.titulo}</h3>
-                        <p>${item.ano}</p>
-                    </div>
-                </a>
-                <button class="btn-remove-lista" onclick="removerItemLista('${item.id}')">
-                    <i class="fas fa-trash"></i> Remover
-                </button>
-            </div>
-        `;
-    });
-    container.innerHTML = html;
-}
-
-window.removerItemLista = function (id) {
-    const user = getActiveUser();
-    if (!user) return;
-
-    const index = user.minhaLista.findIndex(i => i.id === id);
-    if (index !== -1) {
-        user.minhaLista.splice(index, 1);
-        updateActiveUser(user);
-        initMinhaLista();
-        showToast("Item removido.", "info");
-    }
-};
-
-// =================================================================
-// PLAYER DE VÍDEO
-// =================================================================
-
-let conteudoAtualID = null;
-
 function initVideoModal() {
     const modal = document.getElementById('video-modal');
     const iframe = document.getElementById('video-iframe');
     const close = document.getElementById('close-player');
-
     const serieInputs = document.getElementById('serie-inputs');
     const inSeason = document.getElementById('current-season');
     const inEpisode = document.getElementById('current-episode');
@@ -725,7 +614,6 @@ function initVideoModal() {
 
     window.openVideoModal = (url, idDoConteudo = null) => {
         if (!url) return showToast("Vídeo indisponível.", "error");
-
         if (iframe) iframe.src = url;
         if (modal) modal.classList.add('show');
         conteudoAtualID = idDoConteudo;
@@ -764,19 +652,15 @@ function initVideoModal() {
 
     const salvarManual = () => {
         const user = getActiveUser();
-        if (!user) {
-            showToast("Faça login para salvar progresso.", "error");
-            return;
-        }
-
+        if (!user) return showToast("Faça login para salvar progresso.", "error");
         if (!conteudoAtualID) return;
+        
         const item = getContentById(conteudoAtualID);
         if (!item) return;
 
         const h = parseInt(inHour.value) || 0;
         const m = parseInt(inMin.value) || 0;
         const minutosAssistidos = (h * 60) + m;
-
         let duracaoTotal = converterDuracaoParaMinutos(item.duracao);
         if (item.tipo === 'serie' || item.tipo === 'anime') duracaoTotal = 9999;
 
@@ -805,7 +689,6 @@ function initVideoModal() {
 function salvarHistorico(id, porcentagem, hora, minuto, temporada, episodio) {
     const user = getActiveUser();
     if (!user) return;
-
     if (!user.watchHistory) user.watchHistory = [];
     user.watchHistory = user.watchHistory.filter(item => item.id !== id);
 
@@ -816,19 +699,15 @@ function salvarHistorico(id, porcentagem, hora, minuto, temporada, episodio) {
         minutoParada: minuto,
         timestamp: Date.now()
     };
-
     if (temporada && episodio) {
         novo.temporada = temporada;
         novo.episodio = episodio;
     }
-
     user.watchHistory.unshift(novo);
     if (user.watchHistory.length > 20) user.watchHistory.pop();
     updateActiveUser(user);
-
-    if (document.getElementById('continue-watching-section')) {
-        initHomePage();
-    }
+    
+    if(document.getElementById('continue-watching-section')) initHomePage();
 }
 
 function converterDuracaoParaMinutos(duracaoStr) {
@@ -855,23 +734,76 @@ function gerarEstrelasHTML(nota0a10) {
     return html;
 }
 
-// =================================================================
-// GERENCIADOR DE TRANSIÇÕES 2.0 (MPA Support) - CORRIGIDO
-// =================================================================
+function updateListaButton(btn, item) {
+    const user = getActiveUser();
+    if (!user) {
+        btn.innerHTML = '<i class="fas fa-bookmark"></i> Minha Lista';
+        btn.classList.remove('active');
+        return;
+    }
+    const minhaLista = user.minhaLista || [];
+    const exists = minhaLista.some(i => i.id === item.id);
+    if (exists) {
+        btn.innerHTML = '<i class="fas fa-check"></i> Na Lista';
+        btn.classList.add('active');
+    } else {
+        btn.innerHTML = '<i class="fas fa-bookmark"></i> Minha Lista';
+        btn.classList.remove('active');
+    }
+}
 
-document.addEventListener('DOMContentLoaded', () => {
+function toggleMinhaLista(item, btn) {
+    const user = getActiveUser();
+    if (!user) {
+        showToast("Faça login para salvar.", "error");
+        setTimeout(() => window.location.href = 'login.html', 1500);
+        return;
+    }
+    if (!user.minhaLista) user.minhaLista = [];
+    const index = user.minhaLista.findIndex(i => i.id === item.id);
+
+    if (index !== -1) {
+        user.minhaLista.splice(index, 1);
+        showToast("Removido da Minha Lista.", "info");
+        if (btn) {
+            btn.innerHTML = '<i class="fas fa-bookmark"></i> Minha Lista';
+            btn.classList.remove('active');
+        }
+    } else {
+        user.minhaLista.push({
+            id: item.id,
+            titulo: item.titulo,
+            poster: item.poster,
+            ano: item.ano,
+            tipo: item.tipo
+        });
+        showToast("Adicionado à Minha Lista!", "success");
+        if (btn) {
+            btn.innerHTML = '<i class="fas fa-check"></i> Salvo';
+            btn.classList.add('active');
+        }
+    }
+    updateActiveUser(user);
+}
+
+function initTransitionManager() {
     document.addEventListener('click', (e) => {
         const link = e.target.closest('a');
         if (!link) return;
-
-        if (link.href.startsWith(window.location.origin)) {
-            if (link.href.includes('detalhes.html')) {
-                const img = link.querySelector('img');
-                if (img) {
-                    img.style.viewTransitionName = 'poster-morph';
-                }
-            }
+        if (link.href.startsWith(window.location.origin) && link.href.includes('detalhes.html')) {
+            const img = link.querySelector('img');
+            if (img) img.style.viewTransitionName = 'poster-morph';
         }
     });
-});
-// Removida a chave } extra que existia aqui e quebrava o script
+}
+window.removerItemLista = function (id) {
+    const user = getActiveUser();
+    if (!user) return;
+    const index = user.minhaLista.findIndex(i => i.id === id);
+    if (index !== -1) {
+        user.minhaLista.splice(index, 1);
+        updateActiveUser(user);
+        initMinhaLista();
+        showToast("Item removido.", "info");
+    }
+};
