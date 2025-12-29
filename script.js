@@ -47,55 +47,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 2. DETECTOR DE PÁGINA (O CÉREBRO DO SISTEMA)
     // Ele verifica a URL e decide qual função rodar automaticamente.
+// ROTEAMENTO DE PÁGINAS (Corrigido e Blindado)
     const path = window.location.pathname.toLowerCase();
-    const href = window.location.href.toLowerCase();
-    
-    // Verifica se é busca global (parâmetro na URL)
     const urlParams = new URLSearchParams(window.location.search);
     const isGlobalSearch = urlParams.get('global') === 'true';
 
-    // LÓGICA DE DECISÃO:
-    
-    // > HOME (Se for raiz, index.html ou pasta principal)
-    if (path === '/' || path.endsWith('/') || path.includes('index') || path.includes('principal') && !path.includes('.html')) {
-        // Confirmação extra: Se tiver o banner principal, é a Home
-        if (document.querySelector('.hero-banner')) {
-            initHomePage();
-        }
+    // 1. Verifica se é DETALHES (Prioridade alta)
+    if (path.includes('detalhes')) {
+        initDetalhesPage();
     }
-    
-    // > FILMES (Detecta 'filmes' na URL, com ou sem .html)
+    // 2. Verifica se é FILMES
     else if (path.includes('filmes')) {
-        if (isGlobalSearch) {
-            initContentPage('todos', 'Resultados da Busca');
-        } else {
-            initContentPage('filme', 'Filmes');
-        }
+        isGlobalSearch ? initContentPage('todos', 'Resultados da Busca') : initContentPage('filme', 'Filmes');
     }
-    
-    // > SÉRIES
+    // 3. Verifica se é SÉRIES
     else if (path.includes('series')) {
         initContentPage('serie', 'Séries');
     }
-    
-    // > ANIMES
+    // 4. Verifica se é ANIMES
     else if (path.includes('animes')) {
         initContentPage('anime', 'Animes');
     }
-    
-    // > MINHA LISTA
+    // 5. Verifica se é MINHA LISTA
     else if (path.includes('minha-lista') || path.includes('lista')) {
         initMinhaLista();
     }
-    
-    // > DETALHES
-    else if (path.includes('detalhes')) {
-        initDetalhesPage();
-    }
-    
-    // > MINHA CONTA
+    // 6. Verifica se é MINHA CONTA
     else if (path.includes('minha-conta') || path.includes('perfil')) {
         initMinhaConta();
+    }
+    // 7. Sobrou: HOME (Se não for nenhuma das anteriores, assume que é Home)
+    else {
+        initHomePage();
     }
 
     // > LOGIN E CADASTRO (Inicializa forms se existirem)
