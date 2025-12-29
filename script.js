@@ -44,33 +44,32 @@ document.addEventListener('DOMContentLoaded', () => {
     initSearch();
     initVideoModal();
 
-    // ROTEAMENTO DE PÁGINAS (Corrigido para Netlify)
+    // ROTEAMENTO DE PÁGINAS
     const path = window.location.pathname;
     const urlParams = new URLSearchParams(window.location.search);
     const isGlobalSearch = urlParams.get('global') === 'true';
 
     // Roteamento Lógico
-    // Verifica se é Home
-    if (path.endsWith('/') || path.includes('index') || path.includes('principal')) {
+    if (path.includes('index.html') || path.endsWith('/') || path.endsWith('principal/')) {
         initHomePage();
     }
-    // Verifica apenas a palavra-chave (sem .html)
-    else if (path.includes('filmes')) {
+    else if (path.includes('filmes.html')) {
+        // Verifica se é busca global ou listagem normal
         isGlobalSearch ? initContentPage('todos', 'Resultados da Busca') : initContentPage('filme', 'Filmes');
     }
-    else if (path.includes('series')) {
+    else if (path.includes('series.html')) {
         initContentPage('serie', 'Séries');
     }
-    else if (path.includes('animes')) {
+    else if (path.includes('animes.html')) {
         initContentPage('anime', 'Animes');
     }
-    else if (path.includes('minha-lista')) { // <-- Agora funciona no Netlify
+    else if (path.includes('minha-lista.html')) {
         initMinhaLista();
     }
-    else if (path.includes('detalhes')) {
+    else if (path.includes('detalhes.html')) {
         initDetalhesPage();
     }
-    else if (path.includes('minha-conta')) {
+    else if (path.includes('minha-conta.html')) {
         initMinhaConta();
     }
 
@@ -222,22 +221,22 @@ function initHeaderUser() {
 
 function searchContent(termo, tipo = 'todos') {
     if (typeof conteudos === 'undefined') return [];
-
+    
     const termoNorm = termo.toLowerCase().trim();
     // Normaliza o tipo para garantir (ex: 'Série' vira 'série')
     const tipoNorm = tipo.toLowerCase().trim();
 
     return conteudos.filter(item => {
         const itemTipo = item.tipo ? item.tipo.toLowerCase() : '';
-
+        
         // Verifica se o tipo bate (considerando que no data.js pode estar 'serie' ou 'filme')
         const tipoMatch = tipoNorm === 'todos' || itemTipo === tipoNorm;
-
+        
         const termoMatch = !termoNorm ||
             item.titulo.toLowerCase().includes(termoNorm) ||
             (item.categoria && item.categoria.toLowerCase().includes(termoNorm)) ||
             item.genero.toLowerCase().includes(termoNorm);
-
+            
         return tipoMatch && termoMatch;
     });
 }
@@ -327,7 +326,7 @@ function initSearch() {
             // Se estiver na Home, tenta adivinhar o contexto ou manda para busca global
             const resultados = searchContent(val, 'todos');
             const tipos = [...new Set(resultados.map(i => i.tipo))];
-
+            
             if (tipos.length === 1 && tipos[0] === 'anime') {
                 window.location.href = `animes.html?search=${encodeURIComponent(val)}`;
             } else if (tipos.length === 1 && tipos[0] === 'serie') {
@@ -435,7 +434,7 @@ function createContentCard(item, isHistory = false) {
         let tempoTexto = '';
         if (item.savedHour > 0) tempoTexto += `${item.savedHour}h `;
         if (item.savedMin >= 0) tempoTexto += `${item.savedMin}m`;
-
+        
         if (item.savedSeason && item.savedEpisode) {
             overlayHTML = `
                 <div class="episode-badge">
@@ -481,7 +480,7 @@ function initContentPage(tipo, tituloPadrao) {
 
     const params = new URLSearchParams(window.location.search);
     const search = params.get('search');
-
+    
     // Busca conteúdo
     const lista = searchContent(search || '', tipo);
     const titulo = search ? `Resultados para: "${search}"` : tituloPadrao;
@@ -875,3 +874,4 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 });
+// Removida a chave } extra que existia aqui e quebrava o script
