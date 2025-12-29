@@ -20,7 +20,7 @@ function updateActiveUser(userData) {
     // 2. Atualiza o registro dele no "Banco de Dados Geral"
     const db = JSON.parse(localStorage.getItem('winbry_users_db')) || [];
     const index = db.findIndex(u => u.email === userData.email);
-    
+
     if (index !== -1) {
         db[index] = userData; // Atualiza o usuário no banco
         localStorage.setItem('winbry_users_db', JSON.stringify(db));
@@ -42,8 +42,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // 1. INICIALIZAÇÃO DO CORE
     initTheme();
     initMenuMobile();
-    initHeaderUser(); 
-    
+    initHeaderUser();
+
     setTimeout(() => {
         const userActions = document.querySelector('.user-actions');
         if (userActions) userActions.classList.add('auth-loaded');
@@ -96,13 +96,13 @@ document.addEventListener('DOMContentLoaded', () => {
 function initCadastro(form) {
     form.addEventListener('submit', (e) => {
         e.preventDefault();
-        
+
         const nome = document.getElementById('nome').value;
         const email = document.getElementById('email').value.trim(); // Remove espaços
         const senha = document.getElementById('senha').value;
         const confirmar = document.getElementById('confirmar-senha').value;
 
-        if(senha !== confirmar) {
+        if (senha !== confirmar) {
             showToast("As senhas não coincidem!", "error");
             return;
         }
@@ -147,14 +147,14 @@ function initLogin(form) {
 
         // 1. Busca no banco de dados
         const db = JSON.parse(localStorage.getItem('winbry_users_db')) || [];
-        
+
         // 2. Tenta encontrar usuário com email e senha iguais
         const user = db.find(u => u.email === emailInput && u.password === passInput);
 
         if (user) {
             // LOGIN SUCESSO: Define este usuário como a Sessão Ativa
             localStorage.setItem('winbry_active_session', JSON.stringify(user));
-            
+
             showToast(`Bem-vindo de volta, ${user.username}!`, "success");
             setTimeout(() => window.location.href = 'index.html', 1500);
         } else {
@@ -174,7 +174,7 @@ function logout() {
 
 function initMinhaConta() {
     const user = getActiveUser();
-    
+
     // Proteção de Rota
     if (!user) {
         window.location.href = 'login.html';
@@ -210,7 +210,7 @@ function initMinhaConta() {
                 // Atualiza o objeto do usuário e salva no banco
                 user.profileImage = base64String;
                 updateActiveUser(user);
-                
+
                 showToast("Foto atualizada!", "success");
                 initHeaderUser();
             }
@@ -238,7 +238,7 @@ function initHeaderUser() {
             ${primeiroNome}
         `;
         btn.href = 'minha-conta.html';
-        btn.classList.remove('btn-primary'); 
+        btn.classList.remove('btn-primary');
         btn.style.display = 'flex';
         btn.style.alignItems = 'center';
     } else {
@@ -372,7 +372,7 @@ function initHomePage() {
     if (typeof conteudos === 'undefined') return;
 
     const sectionHistory = document.getElementById('continue-watching-section');
-    
+
     // --- LÓGICA DE HISTÓRICO ISOLADO ---
     const user = getActiveUser();
     const historicoData = user ? (user.watchHistory || []) : [];
@@ -590,7 +590,7 @@ function updateListaButton(btn, item) {
 
     const minhaLista = user.minhaLista || [];
     const exists = minhaLista.some(i => i.id === item.id);
-    
+
     if (exists) {
         btn.innerHTML = '<i class="fas fa-check"></i> Na Lista';
         btn.classList.add('active');
@@ -724,7 +724,7 @@ window.removerItemLista = function (id) {
     if (index !== -1) {
         user.minhaLista.splice(index, 1);
         updateActiveUser(user); // Salva no banco
-        
+
         initMinhaLista(); // Re-renderiza a tela
         showToast("Item removido.", "info");
     }
@@ -886,48 +886,31 @@ function gerarEstrelasHTML(nota0a10) {
     return html;
 }
 
-/* --- GERENCIADOR DE TRANSIÇÕES (Ida e Volta) --- */
+/* --- GERENCIADOR DE TRANSIÇÕES 2.0 (MPA Support) --- */
 document.addEventListener('DOMContentLoaded', () => {
-
-    // Intercepta TODOS os cliques em links no site
+    // Escuta cliques em qualquer lugar da página
     document.addEventListener('click', (e) => {
+        // Verifica se o clique foi em um link ou dentro de um card
         const link = e.target.closest('a');
-        
-        // Se não for link, ou se o navegador não suportar animação, ignora
-        if (!link || !document.startViewTransition) return;
 
-        // Verifica se o link é interno (mesmo site) para não animar links externos (Google, etc)
-        const isInternal = link.href.startsWith(window.location.origin);
-        if (!isInternal) return;
+        // Se não for link, ignora
+        if (!link) return;
 
-        // --- LÓGICA 1: INDO PARA DETALHES (Efeito Morph / Crescer) ---
-        if (link.href.includes('detalhes.html')) {
-            e.preventDefault();
+        // Se for um link interno (do próprio site)
+        if (link.href.startsWith(window.location.origin)) {
 
-            // Tenta achar a imagem do poster para fazer a mágica
-            const img = link.querySelector('img') || link.closest('.content-card')?.querySelector('img') || link.querySelector('.banner-img');
+            // LÓGICA DO POSTER (Crescer Imagem)
+            if (link.href.includes('detalhes.html')) {
+                // Procura a imagem dentro do link clicado
+                const img = link.querySelector('img');
 
-            if (img) {
-                // Etiqueta a imagem para ela viajar
-                img.style.viewTransitionName = 'poster-morph';
+                if (img) {
+                    // "Carimba" a imagem para o navegador saber que é ELA que vai viajar
+                    img.style.viewTransitionName = 'poster-morph';
+                }
             }
-
-            // Inicia a transição
-            document.startViewTransition(() => {
-                window.location.href = link.href;
-            });
-        } 
-        
-        // --- LÓGICA 2: VOLTANDO PARA O INÍCIO OU OUTRAS PÁGINAS (Efeito Fade Suave) ---
-        // Se não é detalhes, mas é uma página do site (ex: index.html, filmes.html)
-        else {
-            e.preventDefault();
-            
-            // Aqui NÃO colocamos viewTransitionName, pois queremos apenas o Fade (suavidade)
-            // e não o movimento de imagem
-            document.startViewTransition(() => {
-                window.location.href = link.href;
-            });
+            // Não usamos preventDefault() nem startViewTransition() aqui.
+            // Deixamos o link navegar naturalmente. O CSS @view-transition fará a mágica.
         }
     });
 });
