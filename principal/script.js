@@ -1,28 +1,19 @@
 // =================================================================================
-// SCRIPT.JS - VERSÃO STARK TECH (MULTI-USUÁRIO & FLUXO CORRIGIDO)
+// SCRIPT.JS - VERSÃO STARK TECH (CORRIGIDO)
 // =================================================================================
 
 // --- SISTEMA DE BANCO DE DADOS SIMULADO ---
-// Chaves do LocalStorage:
-// 'winbry_users_db': Array com todos os usuários cadastrados e seus dados.
-// 'winbry_active_session': O usuário que está logado no momento.
-
-// Carrega o usuário ativo ou retorna null
 function getActiveUser() {
     return JSON.parse(localStorage.getItem('winbry_active_session'));
 }
 
-// Salva as alterações do usuário ativo (Atualiza a sessão e o Banco de Dados)
 function updateActiveUser(userData) {
-    // 1. Atualiza a sessão atual
     localStorage.setItem('winbry_active_session', JSON.stringify(userData));
-
-    // 2. Atualiza o registro dele no "Banco de Dados Geral"
     const db = JSON.parse(localStorage.getItem('winbry_users_db')) || [];
     const index = db.findIndex(u => u.email === userData.email);
 
     if (index !== -1) {
-        db[index] = userData; // Atualiza o usuário no banco
+        db[index] = userData;
         localStorage.setItem('winbry_users_db', JSON.stringify(db));
     }
 }
@@ -36,10 +27,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Verificação de Segurança (Data.js)
     if (typeof conteudos === 'undefined') {
-        console.error("ERRO CRÍTICO: Banco de dados (data.js) não encontrado.");
+        console.error("ERRO CRÍTICO: Banco de dados (data.js) não encontrado ou carregado depois do script.js.");
+        // Opcional: Mostrar alerta na tela
+        // alert("Erro: data.js não carregado. Verifique o console.");
     }
 
-    // 1. INICIALIZAÇÃO DO CORE
     initTheme();
     initMenuMobile();
     initHeaderUser();
@@ -52,7 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initSearch();
     initVideoModal();
 
-    // 2. ROTEAMENTO DE PÁGINAS (Router)
+    // ROTEAMENTO DE PÁGINAS
     const path = window.location.pathname;
     const urlParams = new URLSearchParams(window.location.search);
     const isGlobalSearch = urlParams.get('global') === 'true';
@@ -62,6 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
         initHomePage();
     }
     else if (path.includes('filmes.html')) {
+        // Verifica se é busca global ou listagem normal
         isGlobalSearch ? initContentPage('todos', 'Resultados da Busca') : initContentPage('filme', 'Filmes');
     }
     else if (path.includes('series.html')) {
@@ -80,11 +73,10 @@ document.addEventListener('DOMContentLoaded', () => {
         initMinhaConta();
     }
 
-    // Cadastro
+    // Formulários
     const cadastroForm = document.getElementById("cadastroForm");
     if (cadastroForm) initCadastro(cadastroForm);
 
-    // Login
     const loginForm = document.getElementById("loginForm");
     if (loginForm) initLogin(loginForm);
 });
@@ -96,9 +88,8 @@ document.addEventListener('DOMContentLoaded', () => {
 function initCadastro(form) {
     form.addEventListener('submit', (e) => {
         e.preventDefault();
-
         const nome = document.getElementById('nome').value;
-        const email = document.getElementById('email').value.trim(); // Remove espaços
+        const email = document.getElementById('email').value.trim();
         const senha = document.getElementById('senha').value;
         const confirmar = document.getElementById('confirmar-senha').value;
 
@@ -107,32 +98,25 @@ function initCadastro(form) {
             return;
         }
 
-        // 1. Carrega o banco de usuários
         const db = JSON.parse(localStorage.getItem('winbry_users_db')) || [];
-
-        // 2. Verifica se o email já existe
         const userExists = db.find(u => u.email === email);
         if (userExists) {
             showToast("Este email já está cadastrado!", "error");
             return;
         }
 
-        // 3. Cria o novo usuário (COM LISTA E HISTÓRICO VAZIOS)
         const newUser = {
             username: nome,
             email: email,
-            password: senha, // Num app real, isso seria criptografado
+            password: senha,
             plan: 'Gratuito',
             profileImage: null,
-            minhaLista: [],     // <--- DADOS ISOLADOS
-            watchHistory: []    // <--- DADOS ISOLADOS
+            minhaLista: [],
+            watchHistory: []
         };
 
-        // 4. Salva no banco
         db.push(newUser);
         localStorage.setItem('winbry_users_db', JSON.stringify(db));
-
-        // 5. Redireciona para LOGIN (Fluxo Solicitado)
         showToast("Conta criada! Faça login para continuar.", "success");
         setTimeout(() => window.location.href = 'login.html', 2000);
     });
@@ -141,41 +125,30 @@ function initCadastro(form) {
 function initLogin(form) {
     form.addEventListener('submit', (e) => {
         e.preventDefault();
-
         const emailInput = document.getElementById('email').value.trim();
         const passInput = document.getElementById('senha').value;
 
-        // 1. Busca no banco de dados
         const db = JSON.parse(localStorage.getItem('winbry_users_db')) || [];
-
-        // 2. Tenta encontrar usuário com email e senha iguais
         const user = db.find(u => u.email === emailInput && u.password === passInput);
 
         if (user) {
-            // LOGIN SUCESSO: Define este usuário como a Sessão Ativa
             localStorage.setItem('winbry_active_session', JSON.stringify(user));
-
             showToast(`Bem-vindo de volta, ${user.username}!`, "success");
             setTimeout(() => window.location.href = 'index.html', 1500);
         } else {
-            // FALHA
             showToast("Email ou senha incorretos.", "error");
         }
     });
 }
 
 function logout() {
-    localStorage.removeItem('winbry_active_session'); // Remove apenas a sessão, mantendo o banco
+    localStorage.removeItem('winbry_active_session');
     showToast("Desconectando...", "info");
-    setTimeout(() => {
-        window.location.href = 'login.html';
-    }, 1000);
+    setTimeout(() => window.location.href = 'login.html', 1000);
 }
 
 function initMinhaConta() {
     const user = getActiveUser();
-
-    // Proteção de Rota
     if (!user) {
         window.location.href = 'login.html';
         return;
@@ -189,15 +162,14 @@ function initMinhaConta() {
 
     if (elUsername) elUsername.textContent = user.username;
     if (elEmail) elEmail.textContent = user.email;
-    if (elImg) elImg.src = user.profileImage || '../images/foto-generica.jpg';
+    if (elImg) elImg.src = user.profileImage || 'images/foto-generica.jpg';
 
-    // Upload de Foto
     if (elInput) {
         elInput.addEventListener('change', function (e) {
             const file = e.target.files[0];
             if (!file) return;
 
-            if (file.size > 0.5 * 1024 * 1024) { // 500KB Limite
+            if (file.size > 0.5 * 1024 * 1024) {
                 showToast("Imagem muito grande! Use uma menor que 500KB.", "error");
                 return;
             }
@@ -206,11 +178,8 @@ function initMinhaConta() {
             reader.onload = function (readerEvent) {
                 const base64String = readerEvent.target.result;
                 if (elImg) elImg.src = base64String;
-
-                // Atualiza o objeto do usuário e salva no banco
                 user.profileImage = base64String;
                 updateActiveUser(user);
-
                 showToast("Foto atualizada!", "success");
                 initHeaderUser();
             }
@@ -226,13 +195,11 @@ function initMinhaConta() {
 function initHeaderUser() {
     const btn = document.getElementById('user-action');
     if (!btn) return;
-
     const user = getActiveUser();
 
     if (user) {
         const primeiroNome = user.username.split(' ')[0];
-        const foto = user.profileImage || '../images/foto-generica.jpg';
-
+        const foto = user.profileImage || 'images/foto-generica.jpg';
         btn.innerHTML = `
             <img src="${foto}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;border:2px solid var(--color-primary);margin-right:8px;"> 
             ${primeiroNome}
@@ -249,21 +216,27 @@ function initHeaderUser() {
 }
 
 // =================================================================
-// LÓGICA DE DADOS E BUSCA
+// LÓGICA DE DADOS E BUSCA (CORRIGIDA PARA ACENTOS)
 // =================================================================
 
 function searchContent(termo, tipo = 'todos') {
     if (typeof conteudos === 'undefined') return [];
+
     const termoNorm = termo.toLowerCase().trim();
+    // Normaliza o tipo para garantir (ex: 'Série' vira 'série')
     const tipoNorm = tipo.toLowerCase().trim();
 
     return conteudos.filter(item => {
         const itemTipo = item.tipo ? item.tipo.toLowerCase() : '';
+
+        // Verifica se o tipo bate (considerando que no data.js pode estar 'serie' ou 'filme')
         const tipoMatch = tipoNorm === 'todos' || itemTipo === tipoNorm;
+
         const termoMatch = !termoNorm ||
             item.titulo.toLowerCase().includes(termoNorm) ||
             (item.categoria && item.categoria.toLowerCase().includes(termoNorm)) ||
             item.genero.toLowerCase().includes(termoNorm);
+
         return tipoMatch && termoMatch;
     });
 }
@@ -274,7 +247,7 @@ function getContentById(id) {
 }
 
 // =================================================================
-// UI HELPERS (Toast, Modal, Theme)
+// UI HELPERS
 // =================================================================
 
 function showToast(message, type = 'info') {
@@ -287,7 +260,7 @@ function showToast(message, type = 'info') {
     toast.textContent = message;
 
     document.body.appendChild(toast);
-    void toast.offsetWidth;
+    void toast.offsetWidth; // Força reflow
     toast.classList.add('show');
 
     setTimeout(() => {
@@ -342,6 +315,7 @@ function initSearch() {
         if (!val) return;
         const path = window.location.pathname;
 
+        // Redirecionamento inteligente baseado na página atual
         if (path.includes('series.html')) {
             window.location.href = `series.html?search=${encodeURIComponent(val)}`;
         } else if (path.includes('animes.html')) {
@@ -349,8 +323,10 @@ function initSearch() {
         } else if (path.includes('filmes.html') && !new URLSearchParams(window.location.search).get('global')) {
             window.location.href = `filmes.html?search=${encodeURIComponent(val)}`;
         } else {
+            // Se estiver na Home, tenta adivinhar o contexto ou manda para busca global
             const resultados = searchContent(val, 'todos');
             const tipos = [...new Set(resultados.map(i => i.tipo))];
+
             if (tipos.length === 1 && tipos[0] === 'anime') {
                 window.location.href = `animes.html?search=${encodeURIComponent(val)}`;
             } else if (tipos.length === 1 && tipos[0] === 'serie') {
@@ -372,11 +348,10 @@ function initHomePage() {
     if (typeof conteudos === 'undefined') return;
 
     const sectionHistory = document.getElementById('continue-watching-section');
-
-    // --- LÓGICA DE HISTÓRICO ISOLADO ---
     const user = getActiveUser();
     const historicoData = user ? (user.watchHistory || []) : [];
 
+    // Mapeia histórico
     const listaHistorico = historicoData
         .map(h => {
             const filme = conteudos.find(c => c.id === h.id);
@@ -434,7 +409,8 @@ function renderCarousel(sectionId, title, list, isHistory = false) {
     if (list.length === 0) {
         carousel.innerHTML = '<p class="empty-message">Em breve.</p>';
     } else {
-        list.forEach(item => carousel.innerHTML += createContentCard(item, isHistory));
+        // Concatenando HTML de forma eficiente
+        carousel.innerHTML = list.map(item => createContentCard(item, isHistory)).join('');
     }
 
     const btnPrev = document.createElement('button');
@@ -455,10 +431,10 @@ function createContentCard(item, isHistory = false) {
     let overlayHTML = '';
 
     if (isHistory) {
-
         let tempoTexto = '';
         if (item.savedHour > 0) tempoTexto += `${item.savedHour}h `;
         if (item.savedMin >= 0) tempoTexto += `${item.savedMin}m`;
+
         if (item.savedSeason && item.savedEpisode) {
             overlayHTML = `
                 <div class="episode-badge">
@@ -492,21 +468,31 @@ function createContentCard(item, isHistory = false) {
 }
 
 // =================================================================
-// PÁGINA DE LISTAGEM (Filmes/Séries)
+// PÁGINA DE LISTAGEM (Filmes/Séries/Animes)
 // =================================================================
 
 function initContentPage(tipo, tituloPadrao) {
     const container = document.getElementById('content-grid');
-    if (!container) return;
+    if (!container) {
+        console.error(`Erro: Elemento #content-grid não encontrado na página ${window.location.pathname}`);
+        return;
+    }
 
     const params = new URLSearchParams(window.location.search);
     const search = params.get('search');
+
+    // Busca conteúdo
     const lista = searchContent(search || '', tipo);
     const titulo = search ? `Resultados para: "${search}"` : tituloPadrao;
 
     let html = `<h1>${titulo}</h1><div class="content-grid">`;
     if (lista.length === 0) {
-        html += `<div class="empty-message" style="width:100%;text-align:center;">Nenhum conteúdo encontrado.</div>`;
+        // Mensagem de erro amigável se o banco estiver vazio
+        if (typeof conteudos === 'undefined') {
+            html += `<div class="empty-message" style="width:100%;text-align:center;color:red;">Erro: Banco de Dados não carregado.</div>`;
+        } else {
+            html += `<div class="empty-message" style="width:100%;text-align:center;">Nenhum conteúdo encontrado.</div>`;
+        }
     } else {
         lista.forEach(item => html += createContentCard(item));
     }
@@ -576,12 +562,11 @@ function initDetalhesPage() {
 }
 
 // =================================================================
-// MINHA LISTA (ISOLADA POR USUÁRIO)
+// MINHA LISTA
 // =================================================================
 
 function updateListaButton(btn, item) {
     const user = getActiveUser();
-    // Se não tiver usuário, não está na lista
     if (!user) {
         btn.innerHTML = '<i class="fas fa-bookmark"></i> Minha Lista';
         btn.classList.remove('active');
@@ -601,7 +586,6 @@ function updateListaButton(btn, item) {
 }
 
 function toggleMinhaLista(item, btn) {
-    // 1. Verifica sessão
     const user = getActiveUser();
     if (!user) {
         showToast("Faça login para salvar.", "error");
@@ -609,14 +593,10 @@ function toggleMinhaLista(item, btn) {
         return;
     }
 
-    // Garante que o array existe
     if (!user.minhaLista) user.minhaLista = [];
-
-    // 2. Verifica item
     const index = user.minhaLista.findIndex(i => i.id === item.id);
 
     if (index !== -1) {
-        // Remover
         user.minhaLista.splice(index, 1);
         showToast("Removido da Minha Lista.", "info");
         if (btn) {
@@ -624,7 +604,6 @@ function toggleMinhaLista(item, btn) {
             btn.classList.remove('active');
         }
     } else {
-        // Adicionar
         user.minhaLista.push({
             id: item.id,
             titulo: item.titulo,
@@ -638,18 +617,18 @@ function toggleMinhaLista(item, btn) {
             btn.classList.add('active');
         }
     }
-
-    // 3. Salva no banco (Atualiza usuário)
     updateActiveUser(user);
 }
 
 function initMinhaLista() {
     const grid = document.getElementById('lista-container');
-    if (!grid) return;
+    if (!grid) {
+        console.error("Erro: #lista-container não encontrado em minha-lista.html");
+        return;
+    }
 
     const user = getActiveUser();
 
-    // Estado Deslogado
     if (!user) {
         grid.innerHTML = `
             <div class="empty-state">
@@ -662,7 +641,6 @@ function initMinhaLista() {
 
     const lista = user.minhaLista || [];
 
-    // Estado Vazio
     if (lista.length === 0) {
         grid.innerHTML = `
             <div class="empty-state">
@@ -676,7 +654,6 @@ function initMinhaLista() {
 
     renderizarGridLista(lista, grid);
 
-    // Busca Local
     const searchInput = document.getElementById('search-input');
     if (searchInput) {
         searchInput.addEventListener('input', (e) => {
@@ -715,7 +692,6 @@ function renderizarGridLista(lista, container) {
     container.innerHTML = html;
 }
 
-// Remove item da lista (chamado pelo botão)
 window.removerItemLista = function (id) {
     const user = getActiveUser();
     if (!user) return;
@@ -723,15 +699,14 @@ window.removerItemLista = function (id) {
     const index = user.minhaLista.findIndex(i => i.id === id);
     if (index !== -1) {
         user.minhaLista.splice(index, 1);
-        updateActiveUser(user); // Salva no banco
-
-        initMinhaLista(); // Re-renderiza a tela
+        updateActiveUser(user);
+        initMinhaLista();
         showToast("Item removido.", "info");
     }
 };
 
 // =================================================================
-// PLAYER DE VÍDEO (HISTÓRICO ISOLADO)
+// PLAYER DE VÍDEO
 // =================================================================
 
 let conteudoAtualID = null;
@@ -761,7 +736,6 @@ function initVideoModal() {
         if (inEpisode) inEpisode.value = 1;
 
         if (idDoConteudo) {
-            // CARREGA HISTÓRICO DO USUÁRIO LOGADO
             const user = getActiveUser();
             const historico = user ? (user.watchHistory || []) : [];
             const salvo = historico.find(h => h.id === idDoConteudo);
@@ -789,7 +763,6 @@ function initVideoModal() {
     };
 
     const salvarManual = () => {
-        // Verifica login
         const user = getActiveUser();
         if (!user) {
             showToast("Faça login para salvar progresso.", "error");
@@ -831,11 +804,9 @@ function initVideoModal() {
 
 function salvarHistorico(id, porcentagem, hora, minuto, temporada, episodio) {
     const user = getActiveUser();
-    if (!user) return; // Segurança
+    if (!user) return;
 
     if (!user.watchHistory) user.watchHistory = [];
-
-    // Remove entrada antiga desse filme/série
     user.watchHistory = user.watchHistory.filter(item => item.id !== id);
 
     const novo = {
@@ -852,11 +823,9 @@ function salvarHistorico(id, porcentagem, hora, minuto, temporada, episodio) {
     }
 
     user.watchHistory.unshift(novo);
-    if (user.watchHistory.length > 20) user.watchHistory.pop(); // Limite 20 itens
+    if (user.watchHistory.length > 20) user.watchHistory.pop();
+    updateActiveUser(user);
 
-    updateActiveUser(user); // Salva no banco
-
-    // Atualiza a Home se estiver nela
     if (document.getElementById('continue-watching-section')) {
         initHomePage();
     }
@@ -886,31 +855,22 @@ function gerarEstrelasHTML(nota0a10) {
     return html;
 }
 
-/* --- GERENCIADOR DE TRANSIÇÕES 2.0 (MPA Support) --- */
-document.addEventListener('DOMContentLoaded', () => {
-    // Escuta cliques em qualquer lugar da página
-    document.addEventListener('click', (e) => {
-        // Verifica se o clique foi em um link ou dentro de um card
-        const link = e.target.closest('a');
+// =================================================================
+// GERENCIADOR DE TRANSIÇÕES 2.0 (MPA Support) - CORRIGIDO
+// =================================================================
 
-        // Se não for link, ignora
+document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('click', (e) => {
+        const link = e.target.closest('a');
         if (!link) return;
 
-        // Se for um link interno (do próprio site)
         if (link.href.startsWith(window.location.origin)) {
-
-            // LÓGICA DO POSTER (Crescer Imagem)
             if (link.href.includes('detalhes.html')) {
-                // Procura a imagem dentro do link clicado
                 const img = link.querySelector('img');
-
                 if (img) {
-                    // "Carimba" a imagem para o navegador saber que é ELA que vai viajar
                     img.style.viewTransitionName = 'poster-morph';
                 }
             }
-            // Não usamos preventDefault() nem startViewTransition() aqui.
-            // Deixamos o link navegar naturalmente. O CSS @view-transition fará a mágica.
         }
     });
 });
