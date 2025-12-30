@@ -32,7 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 1. Inicializa componentes globais (Menu, Header, Busca)
     if (typeof conteudos === 'undefined') console.error("ERRO: data.js não carregado.");
-    
+
     initTheme();
     initMenuMobile();
     initHeaderUser();
@@ -47,7 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 2. DETECTOR DE PÁGINA (O CÉREBRO DO SISTEMA)
     // Ele verifica a URL e decide qual função rodar automaticamente.
-// ROTEAMENTO DE PÁGINAS (Corrigido e Blindado)
+    // ROTEAMENTO DE PÁGINAS (Corrigido e Blindado)
     const path = window.location.pathname.toLowerCase();
     const urlParams = new URLSearchParams(window.location.search);
     const isGlobalSearch = urlParams.get('global') === 'true';
@@ -148,7 +148,7 @@ function initContentPage(tipo, tituloPadrao) {
 
     const params = new URLSearchParams(window.location.search);
     const search = params.get('search');
-    
+
     const lista = searchContent(search || '', tipo);
     const titulo = search ? `Resultados para: "${search}"` : tituloPadrao;
 
@@ -171,7 +171,7 @@ function initDetalhesPage() {
     const target = container || document.querySelector('main');
 
     if (!item) {
-        if(target) target.innerHTML = '<div class="container" style="padding-top:150px;text-align:center;"><h1>Conteúdo não encontrado.</h1><a href="index.html" class="btn btn-primary">Voltar</a></div>';
+        if (target) target.innerHTML = '<div class="container" style="padding-top:150px;text-align:center;"><h1>Conteúdo não encontrado.</h1><a href="index.html" class="btn btn-primary">Voltar</a></div>';
         return;
     }
 
@@ -179,9 +179,10 @@ function initDetalhesPage() {
     const bg = `background-image: url('${item.banner}');`;
 
     const corClass = item.classificacaoNum >= 18 ? '#000000' :
-        item.classificacaoNum >= 16 ? '#db0000' :
-            item.classificacaoNum >= 14 ? '#e67e22' :
-                item.classificacaoNum >= 12 ? '#f1c40f' : '#2ecc71';
+        item.classificacaoNum >= 16 ? '#db0000' : 
+            item.classificacaoNum >= 14 ? '#e67e22' : 
+                item.classificacaoNum >= 12 ? '#f1c40f' :
+                    item.classificacaoNum >= 10 ? '#0c94e2' : '#2ecc71';
 
     const estrelasHTML = gerarEstrelasHTML(item.popularidade);
 
@@ -213,8 +214,8 @@ function initDetalhesPage() {
             </div>
         </div>
     `;
-    
-    if(target) target.innerHTML = htmlContent;
+
+    if (target) target.innerHTML = htmlContent;
 
     const btnLista = document.getElementById('btn-add-lista');
     if (btnLista) {
@@ -253,7 +254,7 @@ function initMinhaLista() {
     }
 
     renderizarGridLista(lista, grid);
-    
+
     // Busca na lista
     const searchInput = document.getElementById('search-input');
     if (searchInput) {
@@ -309,7 +310,7 @@ function createContentCard(item, isHistory = false) {
         let tempoTexto = '';
         if (item.savedHour > 0) tempoTexto += `${item.savedHour}h `;
         if (item.savedMin >= 0) tempoTexto += `${item.savedMin}m`;
-        
+
         if (item.savedSeason && item.savedEpisode) {
             overlayHTML = `
                 <div class="episode-badge">T${item.savedSeason}:E${item.savedEpisode}</div>
@@ -566,7 +567,7 @@ function initSearch() {
         const val = input.value.trim();
         if (!val) return;
         const path = window.location.pathname.toLowerCase();
-        
+
         if (path.includes('series')) window.location.href = `series.html?search=${encodeURIComponent(val)}`;
         else if (path.includes('animes')) window.location.href = `animes.html?search=${encodeURIComponent(val)}`;
         else if (path.includes('filmes') && !new URLSearchParams(window.location.search).get('global')) {
@@ -637,7 +638,7 @@ function initVideoModal() {
         const user = getActiveUser();
         if (!user) return showToast("Faça login para salvar progresso.", "error");
         if (!conteudoAtualID) return;
-        
+
         const item = getContentById(conteudoAtualID);
         if (!item) return;
 
@@ -689,8 +690,8 @@ function salvarHistorico(id, porcentagem, hora, minuto, temporada, episodio) {
     user.watchHistory.unshift(novo);
     if (user.watchHistory.length > 20) user.watchHistory.pop();
     updateActiveUser(user);
-    
-    if(document.getElementById('continue-watching-section')) initHomePage();
+
+    if (document.getElementById('continue-watching-section')) initHomePage();
 }
 
 function converterDuracaoParaMinutos(duracaoStr) {
