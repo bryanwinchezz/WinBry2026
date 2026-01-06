@@ -134,6 +134,26 @@
         popularidade: 7.5
     },
     {
+        id: "fnaf-2",
+        titulo: "Five Nights at Freddy’s 2",
+        ano: 2025,
+        genero: "Terror",
+        tipo: "filme",
+        categoria: "terror",
+        poster: "images/fnaf-2.jpg",
+        banner: "images/banner-filme.jpg",
+        sinopse: "Após os eventos do primeiro filme, novos segredos vêm à tona quando antigos animatrônicos retornam ainda mais perigosos. A Morte ronda o restaurante, e sobreviver até o amanhecer será mais difícil do que nunca.",
+        videoUrl: "https://playerflixapi.com/filme/tt30274401",
+        trailerUrl: "https://www.youtube.com/watch?v=fnaf2-trailer",
+        elenco: ["Josh Hutcherson", "Matthew Lillard", "Elizabeth Lail"],
+        duracao: "1h 45m",
+        classificacao: "16",
+        classificacaoNum: 16,
+        qualidade: "4K",
+        popularidade: 8.4
+    },
+
+    {
         id: "karate-kid-lendas",
         titulo: "Karatê Kid: Lendas",
         ano: 2025,
