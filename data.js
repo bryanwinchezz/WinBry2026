@@ -152,7 +152,6 @@
         qualidade: "4K",
         popularidade: 8.4
     },
-
     {
         id: "karate-kid-lendas",
         titulo: "Karatê Kid: Lendas",
@@ -552,6 +551,25 @@
         qualidade: "HD",
         popularidade: 8.1
     },
+    {
+        id: "nerve",
+        titulo: "Nerve: Um Jogo Sem Regras",
+        ano: 2016,
+        genero: "Ação",
+        tipo: "filme",
+        categoria: "acao",
+        poster: "images/nerve.jpg",
+        banner: "images/banner-filme.jpg",
+        sinopse: "Uma estudante entra em um jogo online de desafios extremos onde espectadores decidem até onde os jogadores devem ir, colocando sua vida em risco.",
+        videoUrl: "https://playerflixapi.com/filme/tt3531824",
+        trailerUrl: "https://www.youtube.com/watch?v=2PR9MOPTI7g",
+        elenco: ["Emma Roberts", "Dave Franco"],
+        duracao: "1h 36min",
+        classificacao: "14",
+        classificacaoNum: 14,
+        qualidade: "Full HD",
+        popularidade: 7.3
+    },
 
     // --- SÉRIES ---
     {
@@ -591,6 +609,63 @@
         classificacaoNum: 18,
         qualidade: "4K",
         popularidade: 9.0
+    },
+    {
+        id: "grimm",
+        titulo: "Grimm",
+        ano: 2011,
+        genero: "Drama",
+        tipo: "serie",
+        categoria: "drama",
+        poster: "images/grimm.jfif",
+        banner: "images/banner-filme.jpg",
+        sinopse: "Um detetive descobre ser um Grimm, um guardião encarregado de manter o equilíbrio entre a humanidade e criaturas sobrenaturais conhecidas como Wesen.",
+        videoUrl: "https://playerflixapi.com/serie/39351",
+        trailerUrl: "https://www.youtube.com/watch?v=2JmXj0E4FJY",
+        elenco: ["David Giuntoli", "Bitsie Tulloch", "Silas Weir Mitchell"],
+        duracao: "6 temporadas",
+        classificacao: "16",
+        classificacaoNum: 16,
+        qualidade: "Full HD",
+        popularidade: 8.7
+    },
+    {
+        id: "sobrenatural",
+        titulo: "Sobrenatural",
+        ano: 2005,
+        genero: "Terror",
+        tipo: "serie",
+        categoria: "terror",
+        poster: "images/sobrenatural.jpg",
+        banner: "images/banner-serie.jpg",
+        sinopse: "Dois irmãos caçadores percorrem os Estados Unidos enfrentando demônios, fantasmas e entidades sobrenaturais enquanto tentam impedir o apocalipse.",
+        videoUrl: "https://playerflixapi.com/serie/1622",
+        trailerUrl: "https://www.youtube.com/watch?v=t-775JyzDTk",
+        elenco: ["Jared Padalecki", "Jensen Ackles", "Misha Collins"],
+        duracao: "15 temporadas",
+        classificacao: "16",
+        classificacaoNum: 16,
+        qualidade: "Full HD",
+        popularidade: 9.2
+    },
+    {
+        id: "stranger-things",
+        titulo: "Stranger Things",
+        ano: 2016,
+        genero: "Suspense",
+        tipo: "serie",
+        categoria: "suspense",
+        poster: "images/stranger-things.jpg",
+        banner: "images/banner-serie.jpg",
+        sinopse: "Após o desaparecimento de um garoto, um grupo de amigos descobre experimentos secretos, forças sobrenaturais e uma dimensão paralela que ameaça sua cidade.",
+        videoUrl: "https://playerflixapi.com/serie/66732",
+        trailerUrl: "https://www.youtube.com/watch?v=b9EkMc79ZSU",
+        elenco: ["Millie Bobby Brown", "Finn Wolfhard", "Winona Ryder"],
+        duracao: "5 temporadas",
+        classificacao: "16",
+        classificacaoNum: 16,
+        qualidade: "4K",
+        popularidade: 9.4
     },
     {
         id: "pacificador",
