@@ -724,6 +724,25 @@
         qualidade: "Full HD",
         popularidade: 9.2
     },
+    {
+        id: "magnum",
+        titulo: "Magnum",
+        ano: 2026,
+        genero: "Ação, Comédia, Drama",
+        tipo: "serie",
+        categoria: "super-herói",
+        poster: "images/magnum.jpg",
+        banner: "images/banner-filme.jpg",
+        sinopse: "Simon Williams é um ator talentoso cuja vida muda radicalmente quando descobre que possui habilidades extraordinárias enquanto tenta alcançar o estrelato em Hollywood.",
+        videoUrl: "https://playerflixapi.com/serie/198178",
+        trailerUrl: "https://www.youtube.com/embed/jljXyJfiRDQ?si=k1a-BZj-lxnLvlW8",
+        elenco: ["Yahya Abdul-Mateen II", "Ben Kingsley"],
+        duracao: "1 temporada",
+        classificacao: "12",
+        classificacaoNum: 12,
+        qualidade: "4K UHD",
+        popularidade: 9.0
+    },
 
     // --- DESENHOS / CARTOON ---
     {
