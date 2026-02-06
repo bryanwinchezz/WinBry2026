@@ -537,10 +537,12 @@ function showToast(message, type = 'info') {
 }
 
 function initTransitionManager() {
+    if (!document.startViewTransition) return;
+
     document.addEventListener('click', (e) => {
         const link = e.target.closest('a');
         if (!link) return;
-        if (link.href.includes('detalhes.html')) {
+        if (link.href.includes('detalhes')) {
             const img = link.querySelector('img');
             if (img) img.style.viewTransitionName = 'poster-morph';
         }
