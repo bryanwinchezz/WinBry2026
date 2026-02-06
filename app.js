@@ -96,33 +96,32 @@ document.addEventListener('DOMContentLoaded', () => {
     const id = params.get('id');
     const type = params.get('type');
 
-    // VERIFICA SE VEIO DO BOTÃO DA HOME (Hub)
+    // Verifica se veio do botão da Home (Hubs como Marvel, DC)
     const isHub = params.get('global') === 'true';
 
-    if (path.includes('detalhes.html')) {
+    // AQUI ESTÁ A CORREÇÃO: Removemos o ".html" das verificações
+    if (path.includes('detalhes')) {
         if (id && type) loadDetails(type, id);
     }
-    else if (path.includes('filmes.html')) {
+    else if (path.includes('filmes')) {
         currentType = 'movie';
-        // Passamos o isHub para a função decidir
         if (search) handleSearchRouting(search, 'movie', isHub);
         else loadCatalog('movie', 1);
     }
-    else if (path.includes('series.html')) {
+    else if (path.includes('series')) {
         currentType = 'tv';
-        // Séries geralmente buscam direto, mas se quiser aplicar a mesma lógica:
         if (search) loadSearch(search, 'tv', 1);
         else loadCatalog('tv', 1);
     }
-    else if (path.includes('animes.html')) {
+    else if (path.includes('animes')) {
         currentType = 'anime';
         if (search) loadSearch(search, 'tv', 1);
         else loadAnimes(1);
     }
-    else if (path.includes('minha-lista.html')) {
+    else if (path.includes('minha-lista')) {
         initMinhaListaPage();
     }
-    else if (path.includes('index.html') || path === '/' || path.endsWith('/')) {
+    else if (path.includes('index') || path === '/' || path.endsWith('/')) {
         loadHome();
     }
 });
