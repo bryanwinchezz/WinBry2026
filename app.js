@@ -677,7 +677,24 @@ function initLogin(form) {
 function initSearch() {
     const input = document.getElementById('search-input');
     const btn = document.getElementById('search-icon');
-    const go = () => { if (input.value) window.location.href = `filmes.html?search=${encodeURIComponent(input.value)}`; };
+
+    const go = () => {
+        if (input.value) {
+            const path = window.location.pathname;
+            let targetPage = 'filmes.html'; // Padrão (Home ou Filmes)
+
+            // Detecta onde o usuário está e ajusta o destino
+            if (path.includes('series')) {
+                targetPage = 'series.html';
+            } else if (path.includes('animes')) {
+                targetPage = 'animes.html';
+            }
+
+            // Redireciona para a página certa mantendo a categoria
+            window.location.href = `${targetPage}?search=${encodeURIComponent(input.value)}`;
+        }
+    };
+
     if (btn) btn.onclick = go;
     if (input) input.onkeypress = (e) => { if (e.key === 'Enter') go(); };
 }
