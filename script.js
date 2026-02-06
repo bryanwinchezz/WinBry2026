@@ -1,22 +1,64 @@
-// =================================================================================
-// SCRIPT.JS - VERSÃO STARK TECH (PILOTO AUTOMÁTICO)
-// =================================================================================
+// =================================================================
+// SCRIPT.JS - VERSÃO AUTOMÁTICA PROFISSIONAL (CORRIGIDA)
+// =================================================================
 
-// --- SISTEMA DE BANCO DE DADOS SIMULADO ---
+// ⚠️ CONFIGURAÇÕES
+const API_KEY = "55b8ea4272d5e05ac8a517457a4303c4";
+const BASE_URL = "https://api.themoviedb.org/3";
+const IMG_BASE = "https://image.tmdb.org/t/p/w500";
+const BANNER_BASE = "https://image.tmdb.org/t/p/original";
+const LANGUAGE = "&language=pt-BR";
+
+const MOVIE_PLAYER_BASE = "https://playerflixapi.com/filme";
+const TV_PLAYER_BASE = "https://playerflixapi.com/serie";
+
+// --- MAPA DAS MARCAS (CORRIGIDO) ---
+const BRAND_MAP = {
+    // MARVEL: Usa | (ou) para pegar Marvel Studios (420) E Marvel Ent (7505)
+    // Isso traz filmes do MCU, séries antigas e animações.
+    'marvel': { type: 'company', id: '420|7505|19551', title: 'Universo Marvel' },
+
+    // DC: Soma DC Entertainment (9993) com DC Films (128064)
+    'dc': { type: 'company', id: '9993|128064', title: 'Universo DC' },
+
+    // Estúdios e Canais (Mantidos)
+    'cartoon': { type: 'network', id: '56', title: 'Cartoon Network' },
+    'adult': { type: 'network', id: '80', title: 'Adult Swim' },
+    'disney': { type: 'company', id: '2', title: 'Disney' },
+    'illumination': { type: 'company', id: '6704', title: 'Illumination' },
+
+    // Sagas Fechadas (Mantidas como Collection pois são sequências diretas)
+    'star wars': { type: 'collection', id: '10', title: 'Coleção Star Wars' },
+    'invocacao': { type: 'collection', id: '313086', title: 'Coleção Invocação do Mal' },
+    'harry potter': { type: 'collection', id: '1241', title: 'Coleção Harry Potter' },
+    'jurassic': { type: 'collection', id: '328', title: 'Coleção Jurassic Park' },
+    'velozes': { type: 'collection', id: '9485', title: 'Saga Velozes e Furiosos' },
+    'jogos': { type: 'collection', id: '131635', title: 'Jogos Vorazes' },
+    'crepusculo': { type: 'collection', id: '33514', title: 'Saga Crepúsculo' },
+    'transformers': { type: 'collection', id: '8650', title: 'Transformers' }
+};
+
+// Variáveis de Controle Global
+let currentPage = 1;
+let currentType = 'movie';
+let currentBrand = null;
+let currentSearchQuery = '';
+
+// =================================================================
+// 1. SISTEMA DE USUÁRIO (LOCALSTORAGE)
+// =================================================================
+
 function getActiveUser() {
     try {
         const session = localStorage.getItem('winbry_active_session');
         return session ? JSON.parse(session) : null;
-    } catch (e) {
-        return null;
-    }
+    } catch (e) { return null; }
 }
 
 function updateActiveUser(userData) {
     localStorage.setItem('winbry_active_session', JSON.stringify(userData));
     const db = JSON.parse(localStorage.getItem('winbry_users_db')) || [];
     const index = db.findIndex(u => u.email === userData.email);
-
     if (index !== -1) {
         db[index] = userData;
         localStorage.setItem('winbry_users_db', JSON.stringify(db));
@@ -24,346 +66,579 @@ function updateActiveUser(userData) {
 }
 
 // =================================================================
-// INICIALIZAÇÃO & ROTEAMENTO AUTOMÁTICO
+// 2. INICIALIZAÇÃO E ROTEAMENTO
 // =================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("Sistema WinBry+ Iniciado (Modo Automático).");
-
-    // 1. Inicializa componentes globais (Menu, Header, Busca)
-    if (typeof conteudos === 'undefined') console.error("ERRO: data.js não carregado.");
+    const userActions = document.querySelector('.user-actions');
+    if (userActions) {
+        setTimeout(() => {
+            userActions.style.opacity = '1';
+            userActions.style.visibility = 'visible';
+        }, 100);
+    }
 
     initTheme();
     initMenuMobile();
-    initHeaderUser();
     initSearch();
     initVideoModal();
+    initHeaderUser();
     initTransitionManager();
 
-    setTimeout(() => {
-        const userActions = document.querySelector('.user-actions');
-        if (userActions) userActions.classList.add('auth-loaded');
-    }, 50);
+    if (document.getElementById("cadastroForm")) initCadastro(document.getElementById("cadastroForm"));
+    if (document.getElementById("loginForm")) initLogin(document.getElementById("loginForm"));
+    if (document.querySelector('.account-info-card')) initMinhaConta();
 
-    // 2. DETECTOR DE PÁGINA (O CÉREBRO DO SISTEMA)
-    // Ele verifica a URL e decide qual função rodar automaticamente.
-    // ROTEAMENTO DE PÁGINAS (Corrigido e Blindado)
-    const path = window.location.pathname.toLowerCase();
-    const urlParams = new URLSearchParams(window.location.search);
-    const isGlobalSearch = urlParams.get('global') === 'true';
+    // Roteamento
+    const path = window.location.pathname;
+    const params = new URLSearchParams(window.location.search);
+    const search = params.get('search');
+    const id = params.get('id');
+    const type = params.get('type');
 
-    // 1. Verifica se é DETALHES (Prioridade alta)
-    if (path.includes('detalhes')) {
-        initDetalhesPage();
-    }
-    // 2. Verifica se é FILMES
-    else if (path.includes('filmes')) {
-        isGlobalSearch ? initContentPage('todos', 'Resultados da Busca') : initContentPage('filme', 'Filmes');
-    }
-    // 3. Verifica se é SÉRIES
-    else if (path.includes('series')) {
-        initContentPage('serie', 'Séries');
-    }
-    // 4. Verifica se é ANIMES
-    else if (path.includes('animes')) {
-        initContentPage('anime', 'Animes');
-    }
-    // 5. Verifica se é MINHA LISTA
-    else if (path.includes('minha-lista') || path.includes('lista')) {
-        initMinhaLista();
-    }
-    // 6. Verifica se é MINHA CONTA
-    else if (path.includes('minha-conta') || path.includes('perfil')) {
-        initMinhaConta();
-    }
-    // 7. Sobrou: HOME (Se não for nenhuma das anteriores, assume que é Home)
-    else {
-        initHomePage();
-    }
+    // VERIFICA SE VEIO DO BOTÃO DA HOME (Hub)
+    const isHub = params.get('global') === 'true';
 
-    // > LOGIN E CADASTRO (Inicializa forms se existirem)
-    const cadastroForm = document.getElementById("cadastroForm");
-    if (cadastroForm) initCadastro(cadastroForm);
-
-    const loginForm = document.getElementById("loginForm");
-    if (loginForm) initLogin(loginForm);
+    if (path.includes('detalhes.html')) {
+        if (id && type) loadDetails(type, id);
+    }
+    else if (path.includes('filmes.html')) {
+        currentType = 'movie';
+        // Passamos o isHub para a função decidir
+        if (search) handleSearchRouting(search, 'movie', isHub);
+        else loadCatalog('movie', 1);
+    }
+    else if (path.includes('series.html')) {
+        currentType = 'tv';
+        // Séries geralmente buscam direto, mas se quiser aplicar a mesma lógica:
+        if (search) loadSearch(search, 'tv', 1);
+        else loadCatalog('tv', 1);
+    }
+    else if (path.includes('animes.html')) {
+        currentType = 'anime';
+        if (search) loadSearch(search, 'tv', 1);
+        else loadAnimes(1);
+    }
+    else if (path.includes('minha-lista.html')) {
+        initMinhaListaPage();
+    }
+    else if (path.includes('index.html') || path === '/' || path.endsWith('/')) {
+        loadHome();
+    }
 });
 
-// =================================================================
-// FUNÇÕES DAS PÁGINAS (HOME, LISTAS, DETALHES...)
-// =================================================================
+// Função atualizada para diferenciar CLIQUE (Hub) de DIGITAÇÃO (Pesquisa)
+function handleSearchRouting(query, defaultType, isHub) {
+    const brandKey = query.toLowerCase();
 
-function initHomePage() {
-    if (typeof conteudos === 'undefined') return;
-
-    const sectionHistory = document.getElementById('continue-watching-section');
-    const user = getActiveUser();
-    const historicoData = user ? (user.watchHistory || []) : [];
-
-    // Mapeia histórico
-    const listaHistorico = historicoData
-        .map(h => {
-            const filme = conteudos.find(c => c.id === h.id);
-            if (filme) {
-                return {
-                    ...filme,
-                    progressoReal: h.progresso,
-                    savedSeason: h.temporada,
-                    savedEpisode: h.episodio,
-                    savedHour: h.horaParada,
-                    savedMin: h.minutoParada
-                };
-            }
-            return null;
-        })
-        .filter(item => item !== null);
-
-    if (listaHistorico.length > 0 && sectionHistory) {
-        sectionHistory.style.display = 'block';
-        renderCarousel('continue-watching-section', 'Continuar Assistindo', listaHistorico, true);
-    } else if (sectionHistory) {
-        sectionHistory.style.display = 'none';
-    }
-
-    const filmes = searchContent('', 'filme');
-    const series = searchContent('', 'serie');
-    const animes = searchContent('', 'anime');
-
-    renderCarousel('filmes-populares-section', 'Filmes Populares', filmes.slice(0, 12));
-    renderCarousel('series-em-alta-section', 'Séries em Alta', series.slice(0, 12));
-    renderCarousel('animes-recomendados-section', 'Animes Recomendados', animes.slice(0, 12));
-
-    const btnHero = document.getElementById('btn-open-player');
-    if (btnHero) {
-        const idHero = btnHero.getAttribute('data-id');
-        btnHero.addEventListener('click', function () {
-            window.openVideoModal(this.getAttribute('data-video-url'), idHero);
-        });
+    // Só carrega o layout especial da marca se:
+    // 1. A marca existe no mapa (BRAND_MAP)
+    // 2. E veio através de um clique no Hub (isHub é verdadeiro)
+    if (isHub && BRAND_MAP[brandKey]) {
+        currentType = 'brand';
+        currentBrand = brandKey;
+        loadBrandContent(brandKey, 1);
+    } else {
+        // Caso contrário (digitou na barra), faz uma pesquisa de texto normal
+        currentType = 'search';
+        currentSearchQuery = query;
+        loadSearch(query, defaultType, 1);
     }
 }
 
-function initContentPage(tipo, tituloPadrao) {
+// =================================================================
+// 3. INTEGRAÇÃO TMDB & LÓGICA DE CONTEÚDO
+// =================================================================
+
+async function fetchTMDB(endpoint) {
+    try {
+        const char = endpoint.includes('?') ? '&' : '?';
+        const response = await fetch(`${BASE_URL}${endpoint}${char}api_key=${API_KEY}${LANGUAGE}`);
+        return await response.json();
+    } catch (error) { console.error("Erro TMDB:", error); return null; }
+}
+
+async function loadHome() {
+    const movies = await fetchTMDB('/trending/movie/week');
+    if (movies?.results) {
+        setupHeroBanner(movies.results[0]);
+        renderCarousel('filmes-populares-section', 'Filmes Populares', movies.results, 'movie');
+    }
+    const series = await fetchTMDB('/trending/tv/week');
+    if (series?.results) renderCarousel('series-em-alta-section', 'Séries em Alta', series.results, 'tv');
+
+    const animes = await fetchTMDB('/discover/tv?with_genres=16&with_original_language=ja&sort_by=popularity.desc');
+    if (animes?.results) renderCarousel('animes-recomendados-section', 'Animes Recomendados', animes.results, 'tv');
+}
+
+// --- FUNÇÕES DE CARREGAMENTO (COM TRAVA DE 500 PÁGINAS) ---
+
+async function loadCatalog(type, page) {
+    currentPage = page;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    const endpoint = `/discover/${type}?sort_by=popularity.desc&include_adult=false&page=${page}`;
+    const data = await fetchTMDB(endpoint);
+
+    const titulo = type === 'movie' ? 'Filmes' : 'Séries';
+
+    // TRAVA DE SEGURANÇA: API do TMDB limita a 500 páginas para acesso público
+    const totalPages = Math.min(data.total_pages, 500);
+
+    renderGrid(data.results, type, titulo);
+    renderPagination(totalPages, page, (p) => loadCatalog(type, p));
+}
+
+async function loadAnimes(page) {
+    currentPage = page;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    const endpoint = `/discover/tv?with_genres=16&with_original_language=ja&sort_by=popularity.desc&include_adult=false&page=${page}`;
+    const data = await fetchTMDB(endpoint);
+
+    const totalPages = Math.min(data.total_pages, 500);
+
+    renderGrid(data.results, 'tv', 'Animes');
+    renderPagination(totalPages, page, (p) => loadAnimes(p));
+}
+
+async function loadSearch(query, type, page) {
+    currentPage = page;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    const endpoint = `/search/${type}?query=${encodeURIComponent(query)}&page=${page}`;
+    const data = await fetchTMDB(endpoint);
+
+    const totalPages = Math.min(data.total_pages, 500);
+
+    renderGrid(data.results, type, `Busca: "${query}"`);
+    renderPagination(totalPages, page, (p) => loadSearch(query, type, p));
+}
+
+async function loadBrandContent(key, page) {
+    currentPage = page;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    const brand = BRAND_MAP[key];
+    if (!brand) return;
+
+    // Lógica Especial para Coleções (Sagas)
+    if (brand.type === 'collection') {
+        // Coleções não têm paginação no TMDB, elas retornam tudo de uma vez
+        const endpoint = `/collection/${brand.id}`;
+        const data = await fetchTMDB(endpoint);
+
+        if (data && data.parts) {
+            // Filtra apenas os que têm poster e ordena por lançamento (opcional)
+            const filmes = data.parts.filter(m => m.poster_path);
+
+            // Renderiza tudo e esconde a paginação (passa 1 de 1)
+            renderGrid(filmes, 'movie', brand.title);
+            renderPagination(1, 1, null);
+        }
+        return;
+    }
+
+    // Lógica Padrão para Empresas e Keywords
+    let endpoint = '';
+    if (brand.type === 'company') endpoint = `/discover/movie?with_companies=${brand.id}&sort_by=popularity.desc&include_adult=false&page=${page}`;
+    else if (brand.type === 'network') endpoint = `/discover/tv?with_networks=${brand.id}&sort_by=popularity.desc&include_adult=false&page=${page}`;
+    else if (brand.type === 'keyword') endpoint = `/discover/movie?with_keywords=${brand.id}&sort_by=popularity.desc&include_adult=false&page=${page}`;
+
+    const data = await fetchTMDB(endpoint);
+
+    // Trava de 500 páginas do TMDB
+    const totalPages = Math.min(data.total_pages, 500);
+    const mediaType = brand.type === 'network' ? 'tv' : 'movie';
+
+    renderGrid(data.results, mediaType, brand.title);
+    renderPagination(totalPages, page, (p) => loadBrandContent(key, p));
+}
+
+// =================================================================
+// 4. RENDERIZAÇÃO E PAGINAÇÃO ESTÁTICA
+// =================================================================
+
+function renderGrid(items, type, title) {
     const container = document.getElementById('content-grid');
     if (!container) return;
 
-    const params = new URLSearchParams(window.location.search);
-    const search = params.get('search');
+    container.innerHTML = `<h1>${title}</h1><div class="content-grid" id="grid-items"></div>`;
+    const gridItems = document.getElementById('grid-items');
 
-    const lista = searchContent(search || '', tipo);
-    const titulo = search ? `Resultados para: "${search}"` : tituloPadrao;
-
-    let html = `<h1>${titulo}</h1><div class="content-grid">`;
-    if (lista.length === 0) {
-        html += `<div class="empty-message" style="width:100%;text-align:center;">Nenhum conteúdo encontrado.</div>`;
-    } else {
-        lista.forEach(item => html += createContentCard(item));
-    }
-    html += '</div>';
-    container.innerHTML = html;
-}
-
-function initDetalhesPage() {
-    const id = new URLSearchParams(window.location.search).get('id');
-    const item = getContentById(id);
-    const container = document.getElementById('details-container'); // Busca pelo ID específico agora
-
-    // Se não achar o container específico, tenta o main (fallback)
-    const target = container || document.querySelector('main');
-
-    if (!item) {
-        if (target) target.innerHTML = '<div class="container" style="padding-top:150px;text-align:center;"><h1>Conteúdo não encontrado.</h1><a href="index.html" class="btn btn-primary">Voltar</a></div>';
-        return;
-    }
-
-    document.title = `WinBry+ | ${item.titulo}`;
-    const bg = `background-image: url('${item.banner}');`;
-
-    const corClass = item.classificacaoNum >= 18 ? '#000000' :
-        item.classificacaoNum >= 16 ? '#db0000' : 
-            item.classificacaoNum >= 14 ? '#e67e22' : 
-                item.classificacaoNum >= 12 ? '#f1c40f' :
-                    item.classificacaoNum >= 10 ? '#0c94e2' : '#2ecc71';
-
-    const estrelasHTML = gerarEstrelasHTML(item.popularidade);
-
-    // Renderiza
-    const htmlContent = `
-        <div class="details-header" style="${bg}">
-            <div class="overlay"></div>
-            <div class="details-info container">
-                <div class="details-poster">
-                    <img src="${item.poster}" alt="${item.titulo}">
-                </div>
-                <div class="info-text">
-                    <h1>${item.titulo}</h1>
-                    ${estrelasHTML}
-                    <div class="meta-info">
-                        <span class="classificacao" style="background:${corClass}">${item.classificacao}</span>
-                        <span>${item.ano}</span>
-                        <span>${item.duracao}</span>
-                        <span class="qualidade">${item.qualidade}</span>
-                    </div>
-                    <p>${item.sinopse}</p>
-                    <div class="actions">
-                        <button class="btn btn-play" onclick="window.openVideoModal('${item.videoUrl}', '${item.id}')"><i class="fas fa-play"></i> Assistir</button>
-                        <button class="btn btn-trailer" onclick="window.openVideoModal('${item.trailerUrl}')"><i class="fas fa-film"></i> Trailer</button>
-                        <button class="btn btn-lista" id="btn-add-lista" data-id="${item.id}"><i class="fas fa-bookmark"></i> Minha Lista</button>
-                    </div>
-                    <div class="elenco"><strong>Elenco:</strong> ${item.elenco.join(', ')}</div>
-                </div>
-            </div>
-        </div>
-    `;
-
-    if (target) target.innerHTML = htmlContent;
-
-    const btnLista = document.getElementById('btn-add-lista');
-    if (btnLista) {
-        updateListaButton(btnLista, item);
-        btnLista.addEventListener('click', () => toggleMinhaLista(item, btnLista));
-    }
-}
-
-function initMinhaLista() {
-    const grid = document.getElementById('lista-container');
-    if (!grid) return;
-
-    const user = getActiveUser();
-
-    if (!user) {
-        grid.innerHTML = `
-            <div class="empty-state">
-                <i class="fas fa-lock" style="font-size: 3rem; margin-bottom: 20px; color: var(--color-text-secondary);"></i>
-                <h3>Faça login para ver sua lista</h3>
-                <a href="login.html" class="btn btn-primary" style="margin-top: 20px;">Entrar Agora</a>
-            </div>`;
-        return;
-    }
-
-    const lista = user.minhaLista || [];
-
-    if (lista.length === 0) {
-        grid.innerHTML = `
-            <div class="empty-state">
-                <i class="fas fa-bookmark" style="font-size: 3rem; margin-bottom: 20px; color: var(--color-text-secondary);"></i>
-                <h3>Sua lista está vazia</h3>
-                <p>Adicione filmes e séries para assistir mais tarde.</p>
-                <a href="index.html" class="btn btn-secondary" style="margin-top: 20px;">Explorar Conteúdo</a>
-            </div>`;
-        return;
-    }
-
-    renderizarGridLista(lista, grid);
-
-    // Busca na lista
-    const searchInput = document.getElementById('search-input');
-    if (searchInput) {
-        searchInput.addEventListener('input', (e) => {
-            const termo = e.target.value.toLowerCase();
-            const listaFiltrada = lista.filter(item => item.titulo.toLowerCase().includes(termo));
-            renderizarGridLista(listaFiltrada, grid);
-        });
-    }
-}
-
-// =================================================================
-// FUNÇÕES AUXILIARES, CARROSSEL E HELPERS
-// =================================================================
-
-function renderCarousel(sectionId, title, list, isHistory = false) {
-    const section = document.getElementById(sectionId);
-    if (!section) return;
-
-    const container = section.querySelector('.container');
-    container.innerHTML = `<h2>${title}</h2>`;
-
-    const wrapper = document.createElement('div');
-    wrapper.className = 'carousel-wrapper';
-
-    const carousel = document.createElement('div');
-    carousel.className = 'carousel';
-
-    if (list.length === 0) {
-        carousel.innerHTML = '<p class="empty-message">Em breve.</p>';
-    } else {
-        carousel.innerHTML = list.map(item => createContentCard(item, isHistory)).join('');
-    }
-
-    const btnPrev = document.createElement('button');
-    btnPrev.className = 'carousel-btn prev';
-    btnPrev.innerHTML = '<i class="fas fa-chevron-left"></i>';
-    btnPrev.onclick = () => carousel.scrollBy({ left: -300, behavior: 'smooth' });
-
-    const btnNext = document.createElement('button');
-    btnNext.className = 'carousel-btn next';
-    btnNext.innerHTML = '<i class="fas fa-chevron-right"></i>';
-    btnNext.onclick = () => carousel.scrollBy({ left: 300, behavior: 'smooth' });
-
-    wrapper.append(btnPrev, carousel, btnNext);
-    container.appendChild(wrapper);
-}
-
-function createContentCard(item, isHistory = false) {
-    let overlayHTML = '';
-
-    if (isHistory) {
-        let tempoTexto = '';
-        if (item.savedHour > 0) tempoTexto += `${item.savedHour}h `;
-        if (item.savedMin >= 0) tempoTexto += `${item.savedMin}m`;
-
-        if (item.savedSeason && item.savedEpisode) {
-            overlayHTML = `
-                <div class="episode-badge">T${item.savedSeason}:E${item.savedEpisode}</div>
-                <div class="progress-container"><div class="progress-bar-fill" style="width: ${item.progressoReal || 5}%"></div></div>
-            `;
-        }
-        else if (item.progressoReal !== undefined) {
-            overlayHTML = `
-                <div class="episode-badge" style="justify-content: center;">
-                    <span class="badge-time" style="color:#fff; margin:0;">${tempoTexto}</span>
-                </div>
-                <div class="progress-container"><div class="progress-bar-fill" style="width: ${item.progressoReal || 5}%"></div></div>
-            `;
-        }
-    }
-
-    return `
-        <a href="detalhes.html?id=${item.id}" class="content-card">
-            <img src="${item.poster}" alt="${item.titulo}" loading="lazy">
-            ${overlayHTML}
-            <div class="card-info">
-                <h3>${item.titulo}</h3>
-                <p>${item.ano}</p>
-            </div>
-        </a>
-    `;
-}
-
-function renderizarGridLista(lista, container) {
-    if (lista.length === 0) {
-        container.innerHTML = '<p class="empty-message">Nenhum título encontrado na sua lista.</p>';
+    if (!items || items.length === 0) {
+        gridItems.innerHTML = '<p class="empty-state">Nenhum resultado encontrado.</p>';
         return;
     }
 
     let html = '';
-    lista.forEach(item => {
-        html += `
-            <div class="content-card-wrapper" style="position: relative;">
-                <a href="detalhes.html?id=${item.id}" class="content-card">
-                    <img src="${item.poster}" alt="${item.titulo}" loading="lazy">
-                    <div class="card-info">
-                        <h3>${item.titulo}</h3>
-                        <p>${item.ano}</p>
+    items.forEach(item => {
+        html += createCardHTML(item, type);
+    });
+    gridItems.innerHTML = html;
+}
+
+function createCardHTML(item, typeOverride) {
+    const type = typeOverride || item.media_type || 'movie';
+    const poster = item.poster_path ? `${IMG_BASE}${item.poster_path}` : 'images/favicon.png';
+    const titulo = item.title || item.name;
+    const ano = (item.release_date || item.first_air_date || '????').substring(0, 4);
+
+    return `
+    <a href="detalhes.html?id=${item.id}&type=${type}" class="content-card">
+        <img src="${poster}" alt="${titulo}" loading="lazy">
+        <div class="card-info">
+            <h3>${titulo}</h3>
+            <p>${ano}</p>
+        </div>
+    </a>`;
+}
+
+// --- PAGINAÇÃO CORRIGIDA (ESTÁTICA E LIMITADA A 500) ---
+function renderPagination(totalPages, currentPage, callback) {
+    const container = document.getElementById('content-grid');
+
+    const oldPag = document.querySelector('.pagination-container');
+    if (oldPag) oldPag.remove();
+
+    if (totalPages <= 1) return;
+
+    const paginationDiv = document.createElement('div');
+    paginationDiv.className = 'pagination-container';
+
+    // Botão Anterior
+    const prevBtn = createPageButton('<i class="fas fa-chevron-left"></i>', () => callback(currentPage - 1));
+    if (currentPage === 1) prevBtn.disabled = true;
+    paginationDiv.appendChild(prevBtn);
+
+    // Lógica para mostrar números (1 ... 4 5 6 ... 500)
+    // Isso mantêm a barra estável
+
+    let pagesToShow = [];
+
+    if (totalPages <= 7) {
+        // Se tem poucas páginas, mostra todas
+        for (let i = 1; i <= totalPages; i++) pagesToShow.push(i);
+    } else {
+        // Sempre mostra a primeira
+        pagesToShow.push(1);
+
+        if (currentPage > 3) {
+            pagesToShow.push('...');
+        }
+
+        // Calcula intervalo ao redor da página atual
+        let start = Math.max(2, currentPage - 1);
+        let end = Math.min(totalPages - 1, currentPage + 1);
+
+        // Ajuste para não quebrar nos cantos
+        if (currentPage <= 3) { end = 4; }
+        if (currentPage >= totalPages - 2) { start = totalPages - 3; }
+
+        for (let i = start; i <= end; i++) {
+            if (i > 1 && i < totalPages) pagesToShow.push(i);
+        }
+
+        if (currentPage < totalPages - 2) {
+            pagesToShow.push('...');
+        }
+
+        // Sempre mostra a última (Máximo 500)
+        pagesToShow.push(totalPages);
+    }
+
+    // Renderiza os botões calculados
+    pagesToShow.forEach(p => {
+        if (p === '...') {
+            paginationDiv.appendChild(createEllipsis());
+        } else {
+            const btn = createPageButton(p, () => callback(p));
+            if (p === currentPage) btn.classList.add('active');
+            paginationDiv.appendChild(btn);
+        }
+    });
+
+    // Botão Próximo
+    const nextBtn = createPageButton('<i class="fas fa-chevron-right"></i>', () => callback(currentPage + 1));
+    if (currentPage >= totalPages) nextBtn.disabled = true;
+    paginationDiv.appendChild(nextBtn);
+
+    container.parentNode.appendChild(paginationDiv);
+}
+
+function createPageButton(text, onClick) {
+    const btn = document.createElement('button');
+    btn.className = 'page-btn';
+    btn.innerHTML = text;
+    btn.onclick = onClick;
+    return btn;
+}
+
+function createEllipsis() {
+    const span = document.createElement('span');
+    span.innerText = '...';
+    span.style.color = '#fff';
+    span.style.padding = '0 5px';
+    return span;
+}
+
+// =================================================================
+// 5. DETALHES, CARROSSEL E HELPERS
+// =================================================================
+
+async function loadDetails(type, id) {
+    const item = await fetchTMDB(`/${type}/${id}`);
+    if (!item) return;
+    const externalIds = await fetchTMDB(`/${type}/${id}/external_ids`);
+    const imdbId = externalIds ? externalIds.imdb_id : null;
+
+    let classificacao = "L";
+    if (type === 'movie') {
+        const releases = await fetchTMDB(`/movie/${id}/release_dates`);
+        const br = releases?.results?.find(r => r.iso_3166_1 === 'BR');
+        if (br) classificacao = br.release_dates.find(d => d.certification)?.certification || "L";
+    } else {
+        const ratings = await fetchTMDB(`/tv/${id}/content_ratings`);
+        const br = ratings?.results?.find(r => r.iso_3166_1 === 'BR');
+        if (br) classificacao = br.rating;
+    }
+    const corClass = getRatingColor(parseInt(classificacao) || 0, classificacao);
+
+    const bg = item.backdrop_path ? `${BANNER_BASE}${item.backdrop_path}` : 'images/banner-filme.jpg';
+    const poster = item.poster_path ? `${IMG_BASE}${item.poster_path}` : 'images/favicon.png';
+    const titulo = item.title || item.name;
+    const ano = (item.release_date || item.first_air_date || '????').substring(0, 4);
+    const nota = item.vote_average.toFixed(1);
+    const duracaoTxt = formatDuration(item.runtime, item.number_of_seasons);
+
+    const container = document.getElementById('details-container');
+    if (container) {
+        container.innerHTML = `
+        <div class="details-header" style="background-image: url('${bg}');">
+            <div class="overlay"></div>
+            <div class="details-info container">
+                <div class="details-poster">
+                    <img src="${poster}" alt="${titulo}" style="view-transition-name: poster-morph;">
+                </div>
+                <div class="info-text">
+                    <h1>${titulo}</h1>
+                    <div class="star-rating" style="color:#ffd700; font-size:1.2rem; margin:10px 0;">
+                        <i class="fas fa-star"></i> ${nota} 
                     </div>
-                </a>
-                <button class="btn-remove-lista" onclick="removerItemLista('${item.id}')"><i class="fas fa-trash"></i> Remover</button>
+                    <div class="meta-info">
+                        <span class="classificacao" style="background-color:${corClass}; padding: 4px 8px; border-radius:4px; font-weight:bold; color:white;">${classificacao}</span>
+                        <span>${ano}</span>
+                        <span>${duracaoTxt}</span>
+                        <span class="qualidade">HD</span>
+                    </div>
+                    <p>${item.overview || "Sinopse não disponível."}</p>
+                    <div class="actions">
+                        <button class="btn btn-play" id="btn-assistir-detalhes"><i class="fas fa-play"></i> Assistir</button>
+                        <button class="btn btn-lista" id="btn-add-lista"><i class="fas fa-bookmark"></i> Minha Lista</button>
+                    </div>
+                    ${item.genres ? `<div class="elenco" style="margin-top:10px; color:#ccc;"><strong>Gêneros:</strong> ${item.genres.map(g => g.name).join(', ')}</div>` : ''}
+                </div>
             </div>
-        `;
+        </div>`;
+    }
+
+    const btnAssistir = document.getElementById('btn-assistir-detalhes');
+    if (btnAssistir) {
+        btnAssistir.addEventListener('click', () => {
+            let videoUrl = (type === 'movie') ? `${MOVIE_PLAYER_BASE}/${imdbId || id}` : `${TV_PLAYER_BASE}/${id}`;
+            openVideoModal(videoUrl);
+        });
+    }
+
+    const btnLista = document.getElementById('btn-add-lista');
+    if (btnLista) {
+        updateListaButton(btnLista, id);
+        btnLista.addEventListener('click', () => toggleMinhaLista({ id, type, titulo, poster, ano }, btnLista));
+    }
+}
+
+function setupHeroBanner(item) {
+    const bannerImg = document.querySelector('.banner-img');
+    const heroTitle = document.querySelector('.hero-content h1');
+    const heroDesc = document.querySelector('.hero-content p');
+    const heroLink = document.querySelector('.hero-content .btn-info');
+    const heroBtn = document.getElementById('btn-open-player');
+
+    if (bannerImg) bannerImg.src = `${BANNER_BASE}${item.backdrop_path}`;
+    if (heroTitle) heroTitle.innerText = item.title || item.name;
+    if (heroDesc) heroDesc.innerText = item.overview ? item.overview.substring(0, 150) + "..." : "";
+    if (heroLink) heroLink.href = `detalhes.html?id=${item.id}&type=movie`;
+
+    if (heroBtn) {
+        heroBtn.onclick = () => {
+            fetchTMDB(`/movie/${item.id}/external_ids`).then(ids => {
+                const playId = ids.imdb_id || item.id;
+                openVideoModal(`${MOVIE_PLAYER_BASE}/${playId}`);
+            });
+        };
+    }
+}
+
+function renderCarousel(sectionId, title, items, type) {
+    const section = document.getElementById(sectionId);
+    if (!section) return;
+    const container = section.querySelector('.container');
+    container.innerHTML = `<h2>${title}</h2>`;
+    const wrapper = document.createElement('div');
+    wrapper.className = 'carousel-wrapper';
+    const carousel = document.createElement('div');
+    carousel.className = 'carousel';
+    items.forEach(item => carousel.innerHTML += createCardHTML(item, type));
+
+    const prev = document.createElement('button'); prev.className = 'carousel-btn prev'; prev.innerHTML = '<i class="fas fa-chevron-left"></i>';
+    prev.onclick = () => carousel.scrollBy({ left: -300, behavior: 'smooth' });
+    const next = document.createElement('button'); next.className = 'carousel-btn next'; next.innerHTML = '<i class="fas fa-chevron-right"></i>';
+    next.onclick = () => carousel.scrollBy({ left: 300, behavior: 'smooth' });
+
+    wrapper.append(prev, carousel, next);
+    container.appendChild(wrapper);
+}
+
+// --- HELPER FUNCTIONS ---
+
+function formatDuration(minutes, seasons) {
+    if (seasons) return seasons + (seasons === 1 ? " Temporada" : " Temporadas");
+    if (!minutes) return "N/A";
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    return h > 0 ? `${h}h ${m}m` : `${m}min`;
+}
+
+function getRatingColor(num, str) {
+    if (str === 'L' || num === 0) return '#2ecc71';
+    if (num >= 18) return '#000000';
+    if (num >= 16) return '#db0000';
+    if (num >= 14) return '#e67e22';
+    if (num >= 12) return '#f1c40f';
+    if (num >= 10) return '#0c94e2';
+    return '#2ecc71';
+}
+
+function showToast(message, type = 'info') {
+    const existingToast = document.getElementById('active-toast');
+    if (existingToast) existingToast.remove();
+
+    const toast = document.createElement('div');
+    toast.id = 'active-toast';
+    toast.className = `toast ${type}`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    void toast.offsetWidth;
+    toast.classList.add('show');
+
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
+function initTransitionManager() {
+    document.addEventListener('click', (e) => {
+        const link = e.target.closest('a');
+        if (!link) return;
+        if (link.href.includes('detalhes.html')) {
+            const img = link.querySelector('img');
+            if (img) img.style.viewTransitionName = 'poster-morph';
+        }
+    });
+}
+
+function toggleMinhaLista(itemData, btn) {
+    const user = getActiveUser();
+    if (!user) return showToast("Faça login para salvar!", "error");
+
+    if (!user.minhaLista) user.minhaLista = [];
+    const index = user.minhaLista.findIndex(i => String(i.id) === String(itemData.id));
+
+    if (index !== -1) {
+        user.minhaLista.splice(index, 1);
+        showToast("Removido da Minha Lista", "info");
+    } else {
+        user.minhaLista.push(itemData);
+        showToast("Adicionado à Minha Lista", "success");
+    }
+
+    updateActiveUser(user);
+    if (btn) updateListaButton(btn, itemData.id);
+}
+
+function updateListaButton(btn, itemId) {
+    const user = getActiveUser();
+    if (!user) return;
+    const exists = user.minhaLista?.some(i => String(i.id) === String(itemId));
+    if (exists) {
+        btn.innerHTML = '<i class="fas fa-check"></i> Na Lista';
+        btn.classList.add('active');
+        btn.style.backgroundColor = '#4CAF50';
+    } else {
+        btn.innerHTML = '<i class="fas fa-bookmark"></i> Minha Lista';
+        btn.classList.remove('active');
+        btn.style.backgroundColor = '';
+    }
+}
+
+function initMinhaListaPage() {
+    const container = document.getElementById('lista-container');
+    if (!container) return;
+
+    const user = getActiveUser();
+
+    if (!user || !user.minhaLista || user.minhaLista.length === 0) {
+        container.classList.remove('content-grid');
+        container.style.display = 'flex';
+        container.style.justifyContent = 'center';
+        container.style.alignItems = 'center';
+        container.style.minHeight = '300px';
+
+        container.innerHTML = `
+            <div class="empty-state" style="text-align: center;">
+                <i class="fas fa-film" style="font-size: 3rem; margin-bottom: 20px; color: #333;"></i>
+                <h3>Sua lista está vazia.</h3>
+                <p style="color: #666;">Adicione filmes e séries para assistir mais tarde.</p>
+            </div>`;
+        return;
+    }
+
+    container.classList.add('content-grid');
+    container.style.display = 'grid';
+    container.style.removeProperty('justify-content');
+    container.style.removeProperty('align-items');
+
+    let html = '';
+    user.minhaLista.forEach(item => {
+        html += `
+        <div class="content-card-wrapper">
+             <a href="detalhes.html?id=${item.id}&type=${item.type}" class="content-card">
+                <img src="${item.poster}" alt="${item.titulo}">
+                <div class="card-info">
+                    <h3>${item.titulo}</h3>
+                </div>
+            </a>
+            <button onclick="removeItemLista('${item.id}')" class="btn-remove-lista">
+                <i class="fas fa-trash"></i> Remover
+            </button>
+        </div>`;
     });
     container.innerHTML = html;
 }
 
-// --- SISTEMA DE CADASTRO E LOGIN ---
+window.removeItemLista = function (id) {
+    const user = getActiveUser();
+    if (!user) return;
+    const index = user.minhaLista.findIndex(i => String(i.id) === String(id));
+    if (index !== -1) {
+        user.minhaLista.splice(index, 1);
+        updateActiveUser(user);
+        initMinhaListaPage();
+        showToast("Item removido.", "info");
+    }
+}
+
 function initCadastro(form) {
     form.addEventListener('submit', (e) => {
         e.preventDefault();
@@ -371,423 +646,108 @@ function initCadastro(form) {
         const email = document.getElementById('email').value.trim();
         const senha = document.getElementById('senha').value;
         const confirmar = document.getElementById('confirmar-senha').value;
-
-        if (senha !== confirmar) {
-            showToast("As senhas não coincidem!", "error");
-            return;
-        }
-
+        if (senha !== confirmar) return showToast("Senhas não conferem!", "error");
         const db = JSON.parse(localStorage.getItem('winbry_users_db')) || [];
-        const userExists = db.find(u => u.email === email);
-        if (userExists) {
-            showToast("Este email já está cadastrado!", "error");
-            return;
-        }
-
-        const newUser = {
-            username: nome,
-            email: email,
-            password: senha,
-            plan: 'Gratuito',
-            profileImage: null,
-            minhaLista: [],
-            watchHistory: []
-        };
-
-        db.push(newUser);
+        if (db.find(u => u.email === email)) return showToast("Email já cadastrado!", "error");
+        db.push({ username: nome, email, password: senha, minhaLista: [] });
         localStorage.setItem('winbry_users_db', JSON.stringify(db));
-        showToast("Conta criada! Faça login para continuar.", "success");
-        setTimeout(() => window.location.href = 'login.html', 2000);
+        showToast("Conta criada com sucesso!", "success");
+        setTimeout(() => window.location.href = 'login.html', 1500);
     });
 }
 
 function initLogin(form) {
     form.addEventListener('submit', (e) => {
         e.preventDefault();
-        const emailInput = document.getElementById('email').value.trim();
-        const passInput = document.getElementById('senha').value;
-
+        const email = document.getElementById('email').value.trim();
+        const senha = document.getElementById('senha').value;
         const db = JSON.parse(localStorage.getItem('winbry_users_db')) || [];
-        const user = db.find(u => u.email === emailInput && u.password === passInput);
-
+        const user = db.find(u => u.email === email && u.password === senha);
         if (user) {
-            localStorage.setItem('winbry_active_session', JSON.stringify(user));
-            showToast(`Bem-vindo de volta, ${user.username}!`, "success");
-            setTimeout(() => window.location.href = 'index.html', 1500);
+            updateActiveUser(user);
+            showToast("Login realizado!", "success");
+            setTimeout(() => window.location.href = 'index.html', 1000);
         } else {
-            showToast("Email ou senha incorretos.", "error");
+            showToast("Dados incorretos.", "error");
         }
     });
 }
 
-function logout() {
-    localStorage.removeItem('winbry_active_session');
-    showToast("Desconectando...", "info");
-    setTimeout(() => window.location.href = 'login.html', 1000);
+function initSearch() {
+    const input = document.getElementById('search-input');
+    const btn = document.getElementById('search-icon');
+    const go = () => { if (input.value) window.location.href = `filmes.html?search=${encodeURIComponent(input.value)}`; };
+    if (btn) btn.onclick = go;
+    if (input) input.onkeypress = (e) => { if (e.key === 'Enter') go(); };
 }
 
 function initMinhaConta() {
     const user = getActiveUser();
-    if (!user) {
-        window.location.href = 'login.html';
-        return;
-    }
-    // Lógica simples de preencher perfil
-    const elUsername = document.getElementById('display-username');
+    if (!user) return window.location.href = 'login.html';
+    const elUser = document.getElementById('display-username');
     const elEmail = document.getElementById('display-email');
     const elImg = document.getElementById('profile-pic');
-    const elInput = document.getElementById('upload-pic');
-    const btnLogout = document.querySelector('.btn-logout');
-
-    if (elUsername) elUsername.textContent = user.username;
-    if (elEmail) elEmail.textContent = user.email;
-    if (elImg) elImg.src = user.profileImage || 'images/foto-generica.jpg';
-
-    if (elInput) {
-        elInput.addEventListener('change', function (e) {
-            const file = e.target.files[0];
-            if (!file) return;
+    if (elUser) elUser.innerText = user.username;
+    if (elEmail) elEmail.innerText = user.email;
+    if (elImg && user.profileImage) elImg.src = user.profileImage;
+    const upload = document.getElementById('upload-pic');
+    if (upload) upload.onchange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
             const reader = new FileReader();
-            reader.onload = function (readerEvent) {
-                const base64String = readerEvent.target.result;
-                if (elImg) elImg.src = base64String;
-                user.profileImage = base64String;
+            reader.onload = (ev) => {
+                user.profileImage = ev.target.result;
                 updateActiveUser(user);
-                showToast("Foto atualizada!", "success");
+                elImg.src = ev.target.result;
                 initHeaderUser();
-            }
+                showToast("Foto atualizada!", "success");
+            };
             reader.readAsDataURL(file);
-        });
-    }
-
-    if (btnLogout) btnLogout.onclick = (e) => { e.preventDefault(); logout(); };
+        }
+    };
+    const btnLogout = document.querySelector('.btn-logout');
+    if (btnLogout) btnLogout.onclick = () => {
+        localStorage.removeItem('winbry_active_session');
+        showToast("Saindo...", "info");
+        setTimeout(() => window.location.href = 'login.html', 1000);
+    };
 }
 
 function initHeaderUser() {
     const btn = document.getElementById('user-action');
     if (!btn) return;
     const user = getActiveUser();
-
     if (user) {
-        const primeiroNome = user.username.split(' ')[0];
-        const foto = user.profileImage || 'images/foto-generica.jpg';
-        btn.innerHTML = `
-            <img src="${foto}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;border:2px solid var(--color-primary);margin-right:8px;"> 
-            ${primeiroNome}
-        `;
+        const nome = user.username.split(' ')[0];
+        const img = user.profileImage || 'images/favicon.png';
+        btn.innerHTML = `<img src="${img}" style="width:28px;height:28px;border-radius:50%;margin-right:8px;object-fit:cover;"> ${nome}`;
         btn.href = 'minha-conta.html';
         btn.classList.remove('btn-primary');
-        btn.style.display = 'flex';
-        btn.style.alignItems = 'center';
+        btn.style.display = 'flex'; btn.style.alignItems = 'center'; btn.style.backgroundColor = 'transparent'; btn.style.border = '1px solid #333';
     } else {
-        btn.innerHTML = 'Entrar';
-        btn.href = 'login.html';
-        btn.classList.add('btn-primary');
+        btn.innerHTML = 'Entrar'; btn.href = 'login.html'; btn.classList.add('btn-primary'); btn.style.backgroundColor = ''; btn.style.border = '';
     }
 }
 
-// --- BUSCA E HELPERS ---
-function searchContent(termo, tipo = 'todos') {
-    if (typeof conteudos === 'undefined') return [];
-    const termoNorm = termo.toLowerCase().trim();
-    const tipoNorm = tipo.toLowerCase().trim();
-
-    return conteudos.filter(item => {
-        const itemTipo = item.tipo ? item.tipo.toLowerCase() : '';
-        const tipoMatch = tipoNorm === 'todos' || itemTipo === tipoNorm;
-        const termoMatch = !termoNorm ||
-            item.titulo.toLowerCase().includes(termoNorm) ||
-            (item.categoria && item.categoria.toLowerCase().includes(termoNorm)) ||
-            item.genero.toLowerCase().includes(termoNorm);
-        return tipoMatch && termoMatch;
-    });
-}
-
-function getContentById(id) {
-    if (typeof conteudos === 'undefined') return undefined;
-    return conteudos.find(item => item.id === id);
-}
-
-function showToast(message, type = 'info') {
-    const existingToast = document.getElementById('active-toast');
-    if (existingToast) existingToast.remove();
-    const toast = document.createElement('div');
-    toast.id = 'active-toast';
-    toast.classList.add('toast', type);
-    toast.textContent = message;
-    document.body.appendChild(toast);
-    void toast.offsetWidth;
-    toast.classList.add('show');
-    setTimeout(() => {
-        toast.classList.remove('show');
-        setTimeout(() => toast.remove(), 300);
-    }, 3000);
-}
-
-function initTheme() {
-    const toggle = document.getElementById('theme-toggle');
-    if (!toggle) return;
-    const icon = toggle.querySelector('i');
-    if (localStorage.getItem('theme') === 'light') {
-        document.body.classList.add('light-mode');
-        if (icon) icon.className = 'fas fa-moon';
-    }
-    toggle.addEventListener('click', () => {
-        document.body.classList.toggle('light-mode');
-        const isLight = document.body.classList.contains('light-mode');
-        if (icon) icon.className = isLight ? 'fas fa-moon' : 'fas fa-sun';
-        localStorage.setItem('theme', isLight ? 'light' : 'dark');
-    });
-}
-
-function initMenuMobile() {
-    const btn = document.querySelector('.menu-toggle');
-    const nav = document.querySelector('.main-nav');
-    if (btn && nav) {
-        btn.addEventListener('click', () => {
-            nav.classList.toggle('active');
-            const icon = btn.querySelector('i');
-            if (nav.classList.contains('active')) {
-                icon.classList.remove('fa-bars');
-                icon.classList.add('fa-times');
-            } else {
-                icon.classList.remove('fa-times');
-                icon.classList.add('fa-bars');
-            }
-        });
-    }
-}
-
-function initSearch() {
-    const input = document.getElementById('search-input');
-    const btn = document.getElementById('search-icon');
-    if (!input || !btn) return;
-
-    const go = () => {
-        const val = input.value.trim();
-        if (!val) return;
-        const path = window.location.pathname.toLowerCase();
-
-        if (path.includes('series')) window.location.href = `series.html?search=${encodeURIComponent(val)}`;
-        else if (path.includes('animes')) window.location.href = `animes.html?search=${encodeURIComponent(val)}`;
-        else if (path.includes('filmes') && !new URLSearchParams(window.location.search).get('global')) {
-            window.location.href = `filmes.html?search=${encodeURIComponent(val)}`;
-        } else {
-            // Lógica global
-            const resultados = searchContent(val, 'todos');
-            const tipos = [...new Set(resultados.map(i => i.tipo))];
-            if (tipos.length === 1 && tipos[0] === 'anime') window.location.href = `animes.html?search=${encodeURIComponent(val)}`;
-            else if (tipos.length === 1 && tipos[0] === 'serie') window.location.href = `series.html?search=${encodeURIComponent(val)}`;
-            else window.location.href = `filmes.html?search=${encodeURIComponent(val)}&global=true`;
-        }
-    };
-    btn.addEventListener('click', go);
-    input.addEventListener('keypress', (e) => { if (e.key === 'Enter') go(); });
-}
-
-function initVideoModal() {
+function openVideoModal(url) {
     const modal = document.getElementById('video-modal');
     const iframe = document.getElementById('video-iframe');
+    if (modal && iframe) { iframe.src = url; modal.classList.add('show'); }
+}
+function initVideoModal() {
+    const modal = document.getElementById('video-modal');
     const close = document.getElementById('close-player');
-    const serieInputs = document.getElementById('serie-inputs');
-    const inSeason = document.getElementById('current-season');
-    const inEpisode = document.getElementById('current-episode');
-    const inHour = document.getElementById('stop-hour');
-    const inMin = document.getElementById('stop-min');
-    const btnSave = document.getElementById('save-progress-btn');
-
-    window.openVideoModal = (url, idDoConteudo = null) => {
-        if (!url) return showToast("Vídeo indisponível.", "error");
-        if (iframe) iframe.src = url;
-        if (modal) modal.classList.add('show');
-        conteudoAtualID = idDoConteudo;
-
-        if (inHour) inHour.value = '';
-        if (inMin) inMin.value = '';
-        if (inSeason) inSeason.value = 1;
-        if (inEpisode) inEpisode.value = 1;
-
-        if (idDoConteudo) {
-            const user = getActiveUser();
-            const historico = user ? (user.watchHistory || []) : [];
-            const salvo = historico.find(h => h.id === idDoConteudo);
-            const item = getContentById(idDoConteudo);
-
-            if (salvo) {
-                if (salvo.horaParada) inHour.value = salvo.horaParada;
-                if (salvo.minutoParada) inMin.value = salvo.minutoParada;
-                if (salvo.temporada) inSeason.value = salvo.temporada;
-                if (salvo.episodio) inEpisode.value = salvo.episodio;
-            }
-
-            if (item && (item.tipo === 'serie' || item.tipo === 'anime')) {
-                if (serieInputs) serieInputs.style.display = 'flex';
-            } else {
-                if (serieInputs) serieInputs.style.display = 'none';
-            }
-        }
-    };
-
-    const fechar = () => {
-        if (iframe) iframe.src = '';
-        if (modal) modal.classList.remove('show');
-        conteudoAtualID = null;
-    };
-
-    const salvarManual = () => {
-        const user = getActiveUser();
-        if (!user) return showToast("Faça login para salvar progresso.", "error");
-        if (!conteudoAtualID) return;
-
-        const item = getContentById(conteudoAtualID);
-        if (!item) return;
-
-        const h = parseInt(inHour.value) || 0;
-        const m = parseInt(inMin.value) || 0;
-        const minutosAssistidos = (h * 60) + m;
-        let duracaoTotal = converterDuracaoParaMinutos(item.duracao);
-        if (item.tipo === 'serie' || item.tipo === 'anime') duracaoTotal = 9999;
-
-        let porcentagem = 0;
-        if (duracaoTotal > 0 && duracaoTotal !== 9999) {
-            porcentagem = (minutosAssistidos / duracaoTotal) * 100;
-        }
-        if (porcentagem > 100) porcentagem = 100;
-
-        let temp = null;
-        let ep = null;
-        if (item.tipo === 'serie' || item.tipo === 'anime') {
-            temp = inSeason.value;
-            ep = inEpisode.value;
-        }
-
-        salvarHistorico(conteudoAtualID, porcentagem, h, m, temp, ep);
-        showToast("Progresso salvo!", "success");
-        fechar();
-    };
-
-    if (close) close.addEventListener('click', fechar);
-    if (btnSave) btnSave.addEventListener('click', salvarManual);
+    const iframe = document.getElementById('video-iframe');
+    if (close) close.onclick = () => { modal.classList.remove('show'); iframe.src = ''; };
+    if (modal) modal.onclick = (e) => { if (e.target === modal) { modal.classList.remove('show'); iframe.src = ''; } };
 }
-
-function salvarHistorico(id, porcentagem, hora, minuto, temporada, episodio) {
-    const user = getActiveUser();
-    if (!user) return;
-    if (!user.watchHistory) user.watchHistory = [];
-    user.watchHistory = user.watchHistory.filter(item => item.id !== id);
-
-    const novo = {
-        id: id,
-        progresso: Math.floor(porcentagem),
-        horaParada: hora,
-        minutoParada: minuto,
-        timestamp: Date.now()
-    };
-    if (temporada && episodio) {
-        novo.temporada = temporada;
-        novo.episodio = episodio;
-    }
-    user.watchHistory.unshift(novo);
-    if (user.watchHistory.length > 20) user.watchHistory.pop();
-    updateActiveUser(user);
-
-    if (document.getElementById('continue-watching-section')) initHomePage();
+function initTheme() {
+    const toggle = document.getElementById('theme-toggle');
+    if (toggle) toggle.onclick = () => { document.body.classList.toggle('light-mode'); localStorage.setItem('theme', document.body.classList.contains('light-mode') ? 'light' : 'dark'); };
+    if (localStorage.getItem('theme') === 'light') document.body.classList.add('light-mode');
 }
-
-function converterDuracaoParaMinutos(duracaoStr) {
-    if (!duracaoStr) return 0;
-    if (duracaoStr.toLowerCase().includes('temporada')) return 0;
-    let minutos = 0;
-    const horasMatch = duracaoStr.match(/(\d+)h/);
-    if (horasMatch) minutos += parseInt(horasMatch[1]) * 60;
-    const minMatch = duracaoStr.match(/(\d+)m/);
-    if (minMatch) minutos += parseInt(minMatch[1]);
-    return minutos > 0 ? minutos : 120;
+function initMenuMobile() {
+    const btn = document.querySelector('.menu-toggle');
+    const nav = document.querySelector('.main-nav ul');
+    if (btn && nav) btn.onclick = () => nav.classList.toggle('active');
 }
-
-function gerarEstrelasHTML(nota0a10) {
-    const nota = parseFloat(nota0a10) || 0;
-    const estrelas = nota / 2;
-    let html = '<div class="star-rating" title="Nota: ' + nota + '">';
-    for (let i = 1; i <= 5; i++) {
-        if (estrelas >= i) html += '<i class="fas fa-star"></i>';
-        else if (estrelas >= i - 0.5) html += '<i class="fas fa-star-half-alt"></i>';
-        else html += '<i class="far fa-star"></i>';
-    }
-    html += ` <span class="score-text">${nota.toFixed(1)}</span></div>`;
-    return html;
-}
-
-function updateListaButton(btn, item) {
-    const user = getActiveUser();
-    if (!user) {
-        btn.innerHTML = '<i class="fas fa-bookmark"></i> Minha Lista';
-        btn.classList.remove('active');
-        return;
-    }
-    const minhaLista = user.minhaLista || [];
-    const exists = minhaLista.some(i => i.id === item.id);
-    if (exists) {
-        btn.innerHTML = '<i class="fas fa-check"></i> Na Lista';
-        btn.classList.add('active');
-    } else {
-        btn.innerHTML = '<i class="fas fa-bookmark"></i> Minha Lista';
-        btn.classList.remove('active');
-    }
-}
-
-function toggleMinhaLista(item, btn) {
-    const user = getActiveUser();
-    if (!user) {
-        showToast("Faça login para salvar.", "error");
-        setTimeout(() => window.location.href = 'login.html', 1500);
-        return;
-    }
-    if (!user.minhaLista) user.minhaLista = [];
-    const index = user.minhaLista.findIndex(i => i.id === item.id);
-
-    if (index !== -1) {
-        user.minhaLista.splice(index, 1);
-        showToast("Removido da Minha Lista.", "info");
-        if (btn) {
-            btn.innerHTML = '<i class="fas fa-bookmark"></i> Minha Lista';
-            btn.classList.remove('active');
-        }
-    } else {
-        user.minhaLista.push({
-            id: item.id,
-            titulo: item.titulo,
-            poster: item.poster,
-            ano: item.ano,
-            tipo: item.tipo
-        });
-        showToast("Adicionado à Minha Lista!", "success");
-        if (btn) {
-            btn.innerHTML = '<i class="fas fa-check"></i> Salvo';
-            btn.classList.add('active');
-        }
-    }
-    updateActiveUser(user);
-}
-
-function initTransitionManager() {
-    document.addEventListener('click', (e) => {
-        const link = e.target.closest('a');
-        if (!link) return;
-        if (link.href.startsWith(window.location.origin) && link.href.includes('detalhes.html')) {
-            const img = link.querySelector('img');
-            if (img) img.style.viewTransitionName = 'poster-morph';
-        }
-    });
-}
-window.removerItemLista = function (id) {
-    const user = getActiveUser();
-    if (!user) return;
-    const index = user.minhaLista.findIndex(i => i.id === id);
-    if (index !== -1) {
-        user.minhaLista.splice(index, 1);
-        updateActiveUser(user);
-        initMinhaLista();
-        showToast("Item removido.", "info");
-    }
-};

@@ -40,19 +40,19 @@
 
     <main>
         <section class="hero-banner">
-            <img src="images/banner-filme.jpg" alt="Banner de Destaque" class="banner-img">
+            <img src="images/banner-filme.png" alt="Destaque" class="banner-img">
             <div class="container">
                 <div class="hero-content">
-                    <h1>Jurassic World: Recomeço</h1>
-                    <p>Agentes viajam a uma ilha para obter DNA de dinossauros, mas a missão se complica ao descobrirem
-                        um segredo sombrio oculto há décadas.</p>
+                    <h1>Carregando Destaque...</h1>
+                    <p>Aguarde enquanto trazemos o melhor conteúdo para você.</p>
+
                     <div class="hero-actions">
-                        <button id="btn-open-player" class="btn btn-play"
-                            data-video-url="https://playerflixapi.com/filme/tt31036941"
-                            data-id="jurassic-world-recomeco"> <i class="fas fa-play"></i> Assistir Agora
+                        <button id="btn-open-player" class="btn btn-play">
+                            <i class="fas fa-play"></i> Assistir Agora
                         </button>
-                        <a href="detalhes.html?id=jurassic-world-recomeco" class="btn btn-info"><i
-                                class="fas fa-info-circle"></i> Mais Informações</a>
+                        <a href="#" class="btn btn-info">
+                            <i class="fas fa-info-circle"></i> Mais Informações
+                        </a>
                     </div>
                 </div>
             </div>
@@ -154,47 +154,48 @@
         </div>
     </footer>
 
-<div id="video-modal" class="video-modal">
-    <div class="video-modal-content">
-        <div id="close-player" class="close-btn-custom">
-            <i class="fas fa-times"></i>
-        </div>
-
-        <div class="video-wrapper">
-            <iframe id="video-iframe" src="" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>
-        </div>
-        
-        <div id="player-controls" class="player-controls">
-            
-            <div id="serie-inputs" class="control-section" style="display:none;">
-                <div class="input-group">
-                    <label>Temp.</label>
-                    <input type="number" id="current-season" min="1" value="1">
-                </div>
-                <div class="input-group">
-                    <label>Ep.</label>
-                    <input type="number" id="current-episode" min="1" value="1">
-                </div>
+    <div id="video-modal" class="video-modal">
+        <div class="video-modal-content">
+            <div id="close-player" class="close-btn-custom">
+                <i class="fas fa-times"></i>
             </div>
 
-            <div class="control-section border-left">
-                <span class="label-title">Parou em:</span>
-                <div class="input-group">
-                    <input type="number" id="stop-hour" min="0" placeholder="0">
-                    <span class="unit">h</span>
-                </div>
-                <div class="input-group">
-                    <input type="number" id="stop-min" min="0" max="59" placeholder="00">
-                    <span class="unit">m</span>
-                </div>
+            <div class="video-wrapper">
+                <iframe id="video-iframe" src="" frameborder="0" allow="autoplay; encrypted-media"
+                    allowfullscreen></iframe>
             </div>
 
-            <button id="save-progress-btn" class="btn-save">
-                <i class="fas fa-save"></i> Salvar
-            </button>
+            <div id="player-controls" class="player-controls">
+
+                <div id="serie-inputs" class="control-section" style="display:none;">
+                    <div class="input-group">
+                        <label>Temp.</label>
+                        <input type="number" id="current-season" min="1" value="1">
+                    </div>
+                    <div class="input-group">
+                        <label>Ep.</label>
+                        <input type="number" id="current-episode" min="1" value="1">
+                    </div>
+                </div>
+
+                <div class="control-section border-left">
+                    <span class="label-title">Parou em:</span>
+                    <div class="input-group">
+                        <input type="number" id="stop-hour" min="0" placeholder="0">
+                        <span class="unit">h</span>
+                    </div>
+                    <div class="input-group">
+                        <input type="number" id="stop-min" min="0" max="59" placeholder="00">
+                        <span class="unit">m</span>
+                    </div>
+                </div>
+
+                <button id="save-progress-btn" class="btn-save">
+                    <i class="fas fa-save"></i> Salvar
+                </button>
+            </div>
         </div>
     </div>
-</div>
 
     <script src="data.js"></script>
     <script src="script.js"></script>
