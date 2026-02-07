@@ -410,6 +410,15 @@ async function loadDetails(type, id) {
     const nota = item.vote_average.toFixed(1);
     const duracaoTxt = formatDuration(item.runtime, item.number_of_seasons);
 
+    // --- LÓGICA DO LER MAIS ---
+    const sinopseTexto = item.overview || "Sinopse não disponível.";
+    // Se a sinopse for longa (> 150 caracteres), cortamos. Se não, mostramos normal.
+    const isLongText = sinopseTexto.length > 150;
+    const sinopseHtml = `
+        <p class="synopsis-text ${isLongText ? 'clamped' : ''}" id="synopsis-content">${sinopseTexto}</p>
+        ${isLongText ? '<button id="btn-read-more" class="btn-read-more">Ler mais</button>' : ''}
+    `;
+
     const container = document.getElementById('details-container');
     if (container) {
         container.innerHTML = `
@@ -430,8 +439,8 @@ async function loadDetails(type, id) {
                         <span>${duracaoTxt}</span>
                         <span class="qualidade">HD</span>
                     </div>
-                    <p>${item.overview || "Sinopse não disponível."}</p>
-                    <div class="actions">
+                    
+                    ${sinopseHtml} <div class="actions">
                         <button class="btn btn-play" id="btn-assistir-detalhes"><i class="fas fa-play"></i> Assistir</button>
                         <button class="btn btn-lista" id="btn-add-lista"><i class="fas fa-bookmark"></i> Minha Lista</button>
                     </div>
@@ -439,6 +448,25 @@ async function loadDetails(type, id) {
                 </div>
             </div>
         </div>`;
+    }
+
+    // --- ATIVA O BOTÃO LER MAIS ---
+    const btnReadMore = document.getElementById('btn-read-more');
+    if (btnReadMore) {
+        btnReadMore.addEventListener('click', () => {
+            const textEl = document.getElementById('synopsis-content');
+            const isClamped = textEl.classList.contains('clamped');
+
+            if (isClamped) {
+                textEl.classList.remove('clamped');
+                textEl.classList.add('expanded');
+                btnReadMore.innerText = "Ler menos";
+            } else {
+                textEl.classList.remove('expanded');
+                textEl.classList.add('clamped');
+                btnReadMore.innerText = "Ler mais";
+            }
+        });
     }
 
     const btnAssistir = document.getElementById('btn-assistir-detalhes');
@@ -677,26 +705,51 @@ function initLogin(form) {
 function initSearch() {
     const input = document.getElementById('search-input');
     const btn = document.getElementById('search-icon');
+    const searchBox = document.querySelector('.search-box');
 
+    // Função para abrir/fechar
+    const toggleSearch = () => {
+        searchBox.classList.toggle('active'); // Adiciona/Remove classe 'active'
+
+        if (searchBox.classList.contains('active')) {
+            input.style.display = 'block'; // Garante que o input apareça
+            setTimeout(() => input.focus(), 100); // Foca para digitar
+        } else {
+            setTimeout(() => { input.style.display = 'none'; }, 300); // Esconde depois da animação
+        }
+    };
+
+    // Função de pesquisar (Enter ou clicar na lupa se já estiver aberto)
     const go = () => {
         if (input.value) {
             const path = window.location.pathname;
-            let targetPage = 'filmes.html'; // Padrão (Home ou Filmes)
+            let targetPage = 'filmes.html';
+            if (path.includes('series')) targetPage = 'series.html';
+            else if (path.includes('animes')) targetPage = 'animes.html';
 
-            // Detecta onde o usuário está e ajusta o destino
-            if (path.includes('series')) {
-                targetPage = 'series.html';
-            } else if (path.includes('animes')) {
-                targetPage = 'animes.html';
-            }
-
-            // Redireciona para a página certa mantendo a categoria
             window.location.href = `${targetPage}?search=${encodeURIComponent(input.value)}`;
         }
     };
 
-    if (btn) btn.onclick = go;
-    if (input) input.onkeypress = (e) => { if (e.key === 'Enter') go(); };
+    if (btn) {
+        btn.onclick = (e) => {
+            // Se for mobile, alterna a barra. Se for PC, mantém comportamento padrão
+            if (window.innerWidth <= 768) {
+                // Se já estiver aberto e tiver texto, pesquisa. Senão, alterna.
+                if (searchBox.classList.contains('active') && input.value) {
+                    go();
+                } else {
+                    toggleSearch();
+                }
+            } else {
+                go();
+            }
+        };
+    }
+
+    if (input) {
+        input.onkeypress = (e) => { if (e.key === 'Enter') go(); };
+    }
 }
 
 function initMinhaConta() {

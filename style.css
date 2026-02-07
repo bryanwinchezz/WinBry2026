@@ -1795,3 +1795,326 @@ footer {
     text-align: center;
     margin-top: 80px;
 }
+
+/* =================================================================
+   CORREÇÃO VISUAL MOBILE (Kauan - WinBry+)
+   Foco: Legibilidade em Detalhes + Navegação de Utilitários
+   ================================================================= */
+
+@media (max-width: 768px) {
+
+    /* --- 1. ARRUMANDO A PÁGINA DE DETALHES (O PROBLEMA DA FOTO) --- */
+
+    /* O Fundo ocupa a tela toda e fica fixo (efeito parallax) */
+    .details-header {
+        height: 100vh !important;
+        background-position: center top !important;
+        background-attachment: fixed !important;
+        align-items: flex-end !important;
+        /* Empurra conteúdo p/ baixo */
+        padding-bottom: 90px !important;
+        /* Espaço para não cobrir com o menu */
+    }
+
+    /* O Overlay escurece mais embaixo para o texto brilhar */
+    .details-header .overlay {
+        background: linear-gradient(to bottom,
+                rgba(0, 0, 0, 0.3) 0%,
+                rgba(0, 0, 0, 0.6) 50%,
+                rgba(10, 10, 10, 1) 100%) !important;
+    }
+
+    /* Caixa de Texto com Efeito de Vidro (Legibilidade Total) */
+    .details-info .info-text {
+        background: rgba(0, 0, 0, 0.75);
+        /* Fundo escuro transparente */
+        backdrop-filter: blur(10px);
+        /* Desfoque do fundo (Vidro) */
+        padding: 20px;
+        border-radius: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        margin: 0 10px;
+        /* Margem lateral */
+    }
+
+    /* Esconde o poster pequeno (capa) no mobile, pois o fundo já é a capa */
+    .details-poster {
+        display: none !important;
+    }
+
+    /* Ajuste dos botões grandes (Assistir/Lista) para ficarem lado a lado */
+    .actions {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px !important;
+    }
+
+    .btn-play,
+    .btn-lista {
+        width: 100% !important;
+        padding: 12px 0 !important;
+        justify-content: center;
+    }
+
+    /* --- 2. CABEÇALHO DE UTILITÁRIOS (PESQUISA, CONTA, LISTA) --- */
+
+    /* Garante que o Header mostre os ícones */
+    .user-actions {
+        opacity: 1 !important;
+        visibility: visible !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 15px !important;
+        /* Espaço entre ícones */
+        background: transparent !important;
+        border: none !important;
+    }
+
+    /* Esconde a barra de texto de pesquisa (mostra só a lupa para economizar espaço) */
+    #search-input {
+        display: none !important;
+    }
+
+    .search-box {
+        background: transparent !important;
+        border: none !important;
+        padding: 0 !important;
+    }
+
+    /* Aumenta a área de toque dos ícones */
+    .icon-btn,
+    #search-icon {
+        font-size: 1.3rem !important;
+        padding: 5px !important;
+        color: #fff !important;
+    }
+
+    /* Estiliza o botão de perfil para ser só a foto (bolinha) */
+    #user-action {
+        background: transparent !important;
+        border: none !important;
+        padding: 0 !important;
+        font-size: 0 !important;
+        /* Esconde o nome do usuário */
+    }
+
+    #user-action img {
+        margin: 0 !important;
+        width: 32px !important;
+        height: 32px !important;
+        border: 2px solid var(--color-primary);
+        box-shadow: 0 0 10px rgba(229, 9, 20, 0.5);
+    }
+
+    /* Se não tiver foto (botão Entrar), mostra texto normal */
+    #user-action:not(:has(img)) {
+        font-size: 0.9rem !important;
+        background-color: var(--color-primary) !important;
+        padding: 5px 12px !important;
+        border-radius: 4px !important;
+    }
+
+    /* Esconde ícones menos usados no mobile se quiser limpar mais */
+    #theme-toggle,
+    a[href="formulario.html"] {
+        display: none !important;
+    }
+}
+
+/* =================================================================
+   AJUSTE DE GRADE (3 COLUNAS) - KAUAN
+   Transforma a lista vertical em grade de 3 itens
+   ================================================================= */
+
+@media (max-width: 768px) {
+
+    /* --- 1. GRADE DAS PÁGINAS (Filmes, Séries, Animes) --- */
+    .content-grid {
+        /* O segredo: repeat(3, 1fr) cria 3 colunas de tamanho igual */
+        grid-template-columns: repeat(3, 1fr) !important;
+        gap: 8px !important;
+        /* Espaço menor entre eles para caber tudo */
+        padding: 10px !important;
+    }
+
+    /* Ajusta o tamanho do card para caber na coluna apertada */
+    .content-card {
+        width: 100% !important;
+        min-width: 0 !important;
+        /* Permite encolher abaixo de 200px */
+        height: auto !important;
+        aspect-ratio: 2/3 !important;
+        /* Mantém formato de poster (retângulo em pé) */
+        border-radius: 6px !important;
+    }
+
+    /* Como o poster ficou pequeno (3 na tela), o texto tem que diminuir */
+    .card-info {
+        padding: 6px !important;
+        background: linear-gradient(to top, rgba(0, 0, 0, 0.9) 0%, transparent 100%) !important;
+    }
+
+    .card-info h3 {
+        font-size: 0.65rem !important;
+        line-height: 1.1;
+        white-space: normal !important;
+        display: -webkit-box !important;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        -webkit-line-clamp: 2;
+    }
+
+    .card-info p {
+        display: none !important;
+        /* Esconde o ANO para limpar o visual */
+    }
+
+    /* --- 2. CARROSSEL DA HOME (Filmes Populares) --- */
+    /* Para ficar mais "intuitivo" e mostrar que tem mais pro lado */
+
+    .carousel .content-card {
+        /* Tamanho fixo menor para caber uns 2.5 filmes na tela e instigar o scroll */
+        width: 110px !important;
+        min-width: 110px !important;
+        border-radius: 8px !important;
+    }
+
+    /* Ajuste fino na área de scroll */
+    .carousel {
+        padding-left: 15px !important;
+        gap: 10px !important;
+    }
+
+    .content-section h2 {
+        font-size: 1.1rem !important;
+        /* Título da seção menor */
+        margin-left: 15px !important;
+        margin-bottom: 10px !important;
+        border-left-width: 3px !important;
+        /* Tarja vermelha mais fina */
+    }
+}
+
+/* =================================================================
+   TRUNCAR SINOPSE (LER MAIS) - KAUAN
+   ================================================================= */
+
+/* Classe que limita o texto a 3 linhas */
+.synopsis-text.clamped {
+    display: -webkit-box !important;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 5px !important;
+}
+
+/* Classe quando estiver expandido (mostra tudo) */
+.synopsis-text.expanded {
+    display: block !important;
+    -webkit-line-clamp: unset !important;
+}
+
+/* 1. NO PC (Telas grandes): Texto completo, botão escondido */
+.synopsis-text {
+    display: block;
+    overflow: visible;
+}
+
+.btn-read-more {
+    display: none !important;
+    /* Esconde o botão no PC */
+}
+
+/* Botão "Ler mais" discreto e bonito */
+.btn-read-more {
+    background: none;
+    border: none;
+    color: #999;
+    font-weight: bold;
+    font-size: 0.85rem;
+    cursor: pointer;
+    padding: 0;
+    margin-bottom: 15px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition: color 0.3s;
+}
+
+.btn-read-more:hover {
+    color: var(--color-primary);
+    /* Fica vermelho ao passar o mouse */
+}
+
+/* =================================================================
+   CORREÇÃO FINAL (KAUAN): POSTERS HOME + PESQUISA
+   Copie e cole isso no final do seu style.css
+   ================================================================= */
+
+@media (max-width: 768px) {
+
+    /* --- 1. CORREÇÃO DOS POSTERS (HOME E CARROSSEL) --- */
+    /* Isso força a imagem a ter o formato RETANGULAR EM PÉ (2:3) */
+    .carousel .content-card,
+    .content-grid .content-card {
+        aspect-ratio: 2/3 !important;
+        /* A Mágica: Proporção de Poster */
+        height: auto !important;
+        /* Altura automática baseada na largura */
+        width: 120px !important;
+        /* Largura fixa no carrossel */
+        min-width: 120px !important;
+    }
+
+    /* Garante que a imagem preencha o cartão sem esticar */
+    .content-card img {
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: cover !important;
+        /* Corta as bordas se sobrar, mas não achata */
+        border-radius: 6px !important;
+    }
+
+    /* Na grade (Filmes/Séries), o cartão ocupa a largura da coluna */
+    .content-grid .content-card {
+        width: 100% !important;
+        min-width: 0 !important;
+    }
+
+    /* --- 2. CORREÇÃO DA PESQUISA MOBILE --- */
+    /* Esconde o input por padrão (o JS vai mostrar quando clicar) */
+    #search-input {
+        display: none;
+        background-color: #1f1f1f !important;
+        border: 1px solid #444 !important;
+        color: white !important;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Quando o input aparece (via JS), ele precisa de estilo */
+    #search-input[style*="display: block"] {
+        display: block !important;
+        animation: slideInInput 0.3s ease;
+    }
+
+    @keyframes slideInInput {
+        from {
+            width: 0;
+            opacity: 0;
+        }
+
+        to {
+            width: 200px;
+            opacity: 1;
+        }
+    }
+
+    /* Remove padding extra da caixa container para não atrapalhar */
+    .search-box {
+        padding: 0 !important;
+        border: none !important;
+        background: transparent !important;
+    }
+}
