@@ -43,6 +43,7 @@ let currentPage = 1;
 let currentType = 'movie';
 let currentBrand = null;
 let currentSearchQuery = '';
+let currentVideoContext = null; // Vai guardar qual filme está aberto no player
 
 // =================================================================
 // 1. SISTEMA DE USUÁRIO (LOCALSTORAGE)
@@ -84,6 +85,8 @@ document.addEventListener('DOMContentLoaded', () => {
     initVideoModal();
     initHeaderUser();
     initTransitionManager();
+    initSaveButton();
+    loadContinueWatching();
 
     if (document.getElementById("cadastroForm")) initCadastro(document.getElementById("cadastroForm"));
     if (document.getElementById("loginForm")) initLogin(document.getElementById("loginForm"));
@@ -763,10 +766,18 @@ async function loadDetails(type, id) {
             }
         });
     }
-
     const btnAssistir = document.getElementById('btn-assistir-detalhes');
     if (btnAssistir) {
         btnAssistir.addEventListener('click', () => {
+            // --- CÓDIGO NOVO AQUI ---
+            setupSaveProgress({
+                id: item.id,
+                type: type, // 'movie' ou 'tv'
+                titulo: titulo,
+                poster: poster
+            });
+            // ------------------------
+
             let videoUrl = (type === 'movie') ? `${MOVIE_PLAYER_BASE}/${imdbId || id}` : `${TV_PLAYER_BASE}/${id}`;
             openVideoModal(videoUrl);
         });
@@ -1116,4 +1127,127 @@ function initMenuMobile() {
     const btn = document.querySelector('.menu-toggle');
     const nav = document.querySelector('.main-nav ul');
     if (btn && nav) btn.onclick = () => nav.classList.toggle('active');
+}
+
+// =================================================================
+// 6. LÓGICA DE CONTINUAR ASSISTINDO
+// =================================================================
+
+function setupSaveProgress(itemData) {
+    // Guarda os dados do filme atual na variável global quando abre o player
+    currentVideoContext = itemData;
+
+    // Se for série, mostra inputs de temp/ep. Se filme, esconde.
+    const serieInputs = document.getElementById('serie-inputs');
+    if (serieInputs) {
+        serieInputs.style.display = (itemData.type === 'tv') ? 'flex' : 'none';
+    }
+
+    // Tenta preencher os inputs se já tiver progresso salvo antes
+    const user = getActiveUser();
+    if (user && user.history) {
+        const saved = user.history.find(h => String(h.id) === String(itemData.id));
+        if (saved) {
+            document.getElementById('stop-hour').value = saved.progress.h || 0;
+            document.getElementById('stop-min').value = saved.progress.m || 0;
+            if (itemData.type === 'tv') {
+                document.getElementById('current-season').value = saved.progress.s || 1;
+                document.getElementById('current-episode').value = saved.progress.ep || 1;
+            }
+        }
+    }
+}
+
+// Ativa o botão de salvar (Chame isso no initVideoModal ou no DOMContentLoaded)
+function initSaveButton() {
+    const btn = document.getElementById('save-progress-btn');
+    if (!btn) return;
+
+    btn.onclick = () => {
+        if (!currentVideoContext) return;
+
+        const user = getActiveUser();
+        if (!user) return showToast("Faça login para salvar progresso!", "error");
+
+        if (!user.history) user.history = [];
+
+        // Pega os valores dos inputs
+        const h = document.getElementById('stop-hour').value || 0;
+        const m = document.getElementById('stop-min').value || 0;
+        const s = document.getElementById('current-season').value || 1;
+        const ep = document.getElementById('current-episode').value || 1;
+
+        // Remove entrada antiga se existir
+        const index = user.history.findIndex(h => String(h.id) === String(currentVideoContext.id));
+        if (index !== -1) user.history.splice(index, 1);
+
+        // Adiciona novo histórico no TOPO da lista
+        user.history.unshift({
+            ...currentVideoContext,
+            timestamp: new Date().getTime(),
+            progress: { h, m, s, ep }
+        });
+
+        updateActiveUser(user);
+        showToast("Progresso salvo!", "success");
+
+        // Recarrega a seção na home se estiver lá
+        loadContinueWatching();
+    };
+}
+
+// Função para desenhar a seção na Home
+function loadContinueWatching() {
+    const section = document.getElementById('continue-watching-section');
+    if (!section) return;
+
+    const user = getActiveUser();
+    if (!user || !user.history || user.history.length === 0) {
+        section.style.display = 'none';
+        return;
+    }
+
+    section.style.display = 'block';
+    const container = section.querySelector('.container');
+    container.innerHTML = `<h2>Continuar Assistindo de ${user.username.split(' ')[0]}</h2>`;
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'carousel-wrapper';
+
+    const carousel = document.createElement('div');
+    carousel.className = 'carousel';
+
+    user.history.forEach(item => {
+        // Texto do progresso (Ex: 1h 20m ou T1:E5)
+        let progressText = "";
+        if (item.type === 'tv') {
+            progressText = `T${item.progress.s} : E${item.progress.ep} • ${item.progress.h}h ${item.progress.m}m`;
+        } else {
+            progressText = `Parou em: ${item.progress.h}h ${item.progress.m}m`;
+        }
+
+        const html = `
+        <a href="detalhes.html?id=${item.id}&type=${item.type}" class="content-card">
+            <div style="position:relative; width:100%; height:100%;">
+                <img src="${item.poster}" alt="${item.titulo}" loading="lazy">
+                
+                <div style="position:absolute; bottom:0; left:0; width:100%; background:rgba(0,0,0,0.8); padding:8px 5px;">
+                    <p style="color:#ccc; font-size:0.75rem; margin:0 0 4px 0;">${progressText}</p>
+                    <div style="width:100%; height:3px; background:#555; border-radius:2px;">
+                        <div style="width: 50%; height:100%; background:var(--color-primary);"></div>
+                    </div>
+                </div>
+            </div>
+        </a>`;
+        carousel.innerHTML += html;
+    });
+
+    // Adiciona setas (código padrão)
+    const prev = document.createElement('button'); prev.className = 'carousel-btn prev'; prev.innerHTML = '<i class="fas fa-chevron-left"></i>';
+    prev.onclick = () => carousel.scrollBy({ left: -300, behavior: 'smooth' });
+    const next = document.createElement('button'); next.className = 'carousel-btn next'; next.innerHTML = '<i class="fas fa-chevron-right"></i>';
+    next.onclick = () => carousel.scrollBy({ left: 300, behavior: 'smooth' });
+
+    wrapper.append(prev, carousel, next);
+    container.appendChild(wrapper);
 }
