@@ -543,13 +543,20 @@ header .container {
     transform: scale(1.05);
 }
 
+/* --- 1. CORREÇÃO DO ALINHAMENTO (Para o título não subir) --- */
 .details-header {
     position: relative;
-    height: 75vh;
+    min-height: 85vh;
+    /* Altura mínima para caber textos grandes */
+    height: auto;
+    /* Permite crescer se o texto for muito longo */
     background-size: cover;
     background-position: center top;
     display: flex;
-    align-items: flex-end;
+    align-items: flex-start;
+    /* MUDANÇA CRUCIAL: Alinha no topo */
+    padding-top: 15vh;
+    /* Empurra o conteúdo para baixo visualmente */
 }
 
 .details-header .overlay {
@@ -2117,4 +2124,168 @@ footer {
         border: none !important;
         background: transparent !important;
     }
+}
+
+/* =================================================================
+   DESIGN PREMIUM CORRIGIDO (Top 10, Categorias e Em Breve)
+   ================================================================= */
+
+/* --- 1. CATEGORIAS (Agora em Carrossel com Setas) --- */
+.category-card {
+    min-width: 200px;
+    /* Largura fixa para o carrossel */
+    height: 100px;
+    border-radius: 8px;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: transform 0.3s ease, border-color 0.3s ease;
+    display: block;
+    margin-right: 10px;
+    /* Espaço entre itens no carrossel */
+}
+
+.category-card:hover {
+    transform: scale(1.05);
+    border-color: var(--color-primary);
+    z-index: 10;
+}
+
+.category-card img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    filter: brightness(0.4);
+}
+
+.category-card:hover img {
+    filter: brightness(0.6);
+}
+
+.category-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.category-overlay h3 {
+    color: #fff;
+    font-size: 1rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+    margin: 0;
+}
+
+/* =================================================================
+   TOP 10 ESTILO NETFLIX (CORRIGIDO: Proporção e Visibilidade)
+   ================================================================= */
+
+.top10-wrapper .carousel {
+    display: flex;
+    align-items: center;
+    padding: 30px 0 50px 20px;
+    /* Mais espaço embaixo para o número não cortar */
+    overflow-y: visible;
+    /* Garante que o número gigante apareça */
+}
+
+.top10-card-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+    margin-right: -30px;
+    /* Aproxima um bloco do outro para sobreposição */
+    transition: transform 0.3s ease;
+    /* Removemos transform scale padrão para evitar distorção inicial */
+}
+
+.top10-card-container:hover {
+    transform: scale(1.1);
+    z-index: 100;
+    /* Traz para frente ao passar o mouse */
+}
+
+/* O NÚMERO GIGANTE */
+.rank-number {
+    font-size: 10rem;
+    font-weight: 900;
+    color: #000000;
+    -webkit-text-stroke: 4px #595959;
+    font-family: 'Arial Black', 'Impact', sans-serif;
+    line-height: 1;
+    position: relative;
+    /* Mudamos para relative para ocupar espaço real */
+    left: 10px;
+    /* Ajuste fino */
+    z-index: 1;
+    letter-spacing: -5px;
+    display: flex;
+    align-items: flex-end;
+    /* Alinha na base */
+}
+
+/* O POSTER (NA FRENTE) */
+.top10-card-container .content-card {
+    /* PROPORÇÃO DE POSTER DE CINEMA (2:3) */
+    width: 150px;
+    height: 225px;
+    min-width: 150px;
+    /* Impede que ele seja esmagado */
+
+    z-index: 2;
+    /* Fica NA FRENTE do número */
+    margin-left: -20px;
+    /* Entra levemente em cima do número (Overlap) */
+    box-shadow: 10px 10px 20px rgba(0, 0, 0, 0.8);
+    border-radius: 4px;
+    overflow: hidden;
+    background: #141414;
+    /* Fundo caso a imagem demore */
+}
+
+/* Garante que a imagem preencha sem distorcer (SEM ACHATAR) */
+.top10-card-container .content-card img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    /* Corta as bordas se sobrar, mas não estica/achata */
+    display: block;
+}
+
+/* Ajuste específico para o número 1 (que é muito fino) */
+.top10-card-container:first-child .rank-number {
+    margin-right: -10px;
+}
+
+/* --- 3. EM BREVE (Poster Normal + Tarja) --- */
+.upcoming-card {
+    min-width: var(--card-width);
+    /* Usa o tamanho padrão dos outros filmes */
+    height: var(--card-height);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+    margin-right: 15px;
+}
+
+.date-badge {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background-color: #E50914;
+    color: white;
+    font-weight: 800;
+    text-align: center;
+    padding: 6px 0;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    z-index: 10;
 }

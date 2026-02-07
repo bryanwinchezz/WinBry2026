@@ -157,17 +157,312 @@ async function fetchTMDB(endpoint) {
     } catch (error) { console.error("Erro TMDB:", error); return null; }
 }
 
+// =================================================================
+// ATUALIZAÇÃO DA HOME (Copie e substitua no app.js)
+// =================================================================
+
 async function loadHome() {
-    const movies = await fetchTMDB('/trending/movie/week');
-    if (movies?.results) {
-        setupHeroBanner(movies.results[0]);
-        renderCarousel('filmes-populares-section', 'Filmes Populares', movies.results, 'movie');
+    console.log("Iniciando carregamento da Home...");
+
+    // 1. Destaque Principal
+    const trendingMovies = await fetchTMDB('/trending/movie/week');
+    if (trendingMovies?.results) {
+        setupHeroBanner(trendingMovies.results[0]);
+        // Top 10 Brasil
+        renderTop10('top10-section', 'Top 10 no Brasil Hoje', trendingMovies.results.slice(0, 10));
     }
+
+    // 2. Carregar Categorias (Novo Carrossel com Setas)
+    loadCategoriesCarousel();
+
+    // 3. Filmes Populares (Carrossel Padrão)
+    // Se isso não estava aparecendo, agora vai forçar
+    if (trendingMovies?.results) {
+        renderCarousel('filmes-populares-section', 'Filmes Populares', trendingMovies.results, 'movie');
+    }
+
+    // 4. Em Breve (Até o fim de 2026)
+    loadUnlimitedUpcoming();
+
+    // 5. Séries e Animes
     const series = await fetchTMDB('/trending/tv/week');
     if (series?.results) renderCarousel('series-em-alta-section', 'Séries em Alta', series.results, 'tv');
 
     const animes = await fetchTMDB('/discover/tv?with_genres=16&with_original_language=ja&sort_by=popularity.desc');
     if (animes?.results) renderCarousel('animes-recomendados-section', 'Animes Recomendados', animes.results, 'tv');
+}
+
+// --- NOVA FUNÇÃO: CATEGORIAS COM SETAS E MAIS OPÇÕES ---
+async function loadCategoriesCarousel() {
+    const sectionId = 'categorias-section';
+    const container = document.getElementById(sectionId);
+    if (!container) return;
+
+    // Estrutura do Carrossel
+    container.querySelector('.container').innerHTML = `
+        <h2>Navegar por Categorias</h2>
+        <div class="carousel-wrapper">
+            <button class="carousel-btn prev"><i class="fas fa-chevron-left"></i></button>
+            <div class="carousel" id="cat-carousel-inner"></div>
+            <button class="carousel-btn next"><i class="fas fa-chevron-right"></i></button>
+        </div>
+    `;
+
+    const carouselInner = document.getElementById('cat-carousel-inner');
+    const btnPrev = container.querySelector('.prev');
+    const btnNext = container.querySelector('.next');
+
+    // Lista Expandida de Categorias
+    const categorias = [
+        { id: 28, name: 'Ação', type: 'movie' },
+        { id: 12, name: 'Aventura', type: 'movie' },
+        { id: 16, name: 'Animes', type: 'tv' }, // Anime é TV geralmente
+        { id: 35, name: 'Comédia', type: 'movie' },
+        { id: 80, name: 'Crime', type: 'movie' },
+        { id: 99, name: 'Documentário', type: 'movie' },
+        { id: 18, name: 'Drama', type: 'movie' },
+        { id: 10751, name: 'Família', type: 'movie' },
+        { id: 14, name: 'Fantasia', type: 'movie' },
+        { id: 36, name: 'História', type: 'movie' },
+        { id: 27, name: 'Terror', type: 'movie' },
+        { id: 10402, name: 'Música', type: 'movie' },
+        { id: 9648, name: 'Mistério', type: 'movie' },
+        { id: 10749, name: 'Romance', type: 'movie' },
+        { id: 878, name: 'Ficção Científica', type: 'movie' },
+        { id: 10752, name: 'Guerra', type: 'movie' },
+        { id: 37, name: 'Faroeste', type: 'movie' }
+    ];
+
+    let html = '';
+
+    // 1. Criamos um conjunto externo para guardar os IDs dos filmes já usados
+    const usedIds = new Set();
+
+    // Carregamento paralelo
+    const promessas = categorias.map(async (cat) => {
+        // Pega os filmes da categoria
+        const data = await fetchTMDB(`/discover/${cat.type}?with_genres=${cat.id}&sort_by=popularity.desc&page=1`);
+        const results = data?.results || [];
+
+        // 2. Lógica de Seleção Única:
+        // Procura na lista o primeiro filme que tenha imagem E que ainda não esteja no conjunto 'usedIds'
+        let selectedItem = results.find(item => item.backdrop_path && !usedIds.has(item.id));
+
+        // Fallback: Se não achou nenhum único (raro) ou a lista acabou, pega um aleatório dos top 10 para variar
+        if (!selectedItem && results.length > 0) {
+            const randomIndex = Math.floor(Math.random() * Math.min(10, results.length));
+            selectedItem = results[randomIndex];
+        }
+
+        // 3. Adiciona o ID escolhido ao conjunto para não ser usado na próxima categoria
+        if (selectedItem) {
+            usedIds.add(selectedItem.id);
+        }
+
+        // Define o background usando o item escolhido
+        const bg = selectedItem?.backdrop_path
+            ? `https://image.tmdb.org/t/p/w500${selectedItem.backdrop_path}`
+            : 'images/banner-filme.jpg';
+
+        return `
+        <a href="${cat.type === 'tv' ? 'animes.html' : 'filmes.html'}?search=${cat.name}" class="category-card">
+            <img src="${bg}" loading="lazy" alt="${cat.name}">
+            <div class="category-overlay">
+                <h3>${cat.name}</h3>
+            </div>
+        </a>`;
+    });
+
+    const resultados = await Promise.all(promessas);
+    carouselInner.innerHTML = resultados.join('');
+
+    // Ativa os botões
+    btnPrev.onclick = () => carouselInner.scrollBy({ left: -400, behavior: 'smooth' });
+    btnNext.onclick = () => carouselInner.scrollBy({ left: 400, behavior: 'smooth' });
+}
+
+// --- FUNÇÃO: EM BREVE (ORDEM CRONOLÓGICA - DIA/MÊS) ---
+async function loadUnlimitedUpcoming() {
+    const sectionId = 'em-breve-section';
+    const section = document.getElementById(sectionId);
+    if (!section) return;
+
+    // Datas Dinâmicas
+    const hoje = new Date().toISOString().split('T')[0];
+    const fim2026 = '2026-12-31';
+
+    // 1. Busca FILMES futuros
+    // Nota: removemos o sort_by da API aqui pois vamos ordenar manualmente no JS
+    const reqMovies = fetchTMDB(`/discover/movie?primary_release_date.gte=${hoje}&primary_release_date.lte=${fim2026}&page=1`);
+
+    // 2. Busca SÉRIES/ANIMES futuros
+    const reqTV = fetchTMDB(`/discover/tv?first_air_date.gte=${hoje}&first_air_date.lte=${fim2026}&page=1`);
+
+    // Aguarda os dois
+    const [resMovies, resTV] = await Promise.all([reqMovies, reqTV]);
+
+    // Combina as listas
+    let combinados = [];
+    if (resMovies?.results) {
+        combinados = [...combinados, ...resMovies.results.map(i => ({ ...i, media_type: 'movie' }))];
+    }
+    if (resTV?.results) {
+        combinados = [...combinados, ...resTV.results.map(i => ({ ...i, media_type: 'tv' }))];
+    }
+
+    // 3. ORDENAÇÃO CRONOLÓGICA (O MAIS PRÓXIMO PRIMEIRO)
+    combinados.sort((a, b) => {
+        // Pega a data de cada um (Filme ou Série)
+        const dataA = new Date(a.release_date || a.first_air_date);
+        const dataB = new Date(b.release_date || b.first_air_date);
+        return dataA - dataB; // Do menor (mais cedo) para o maior (mais tarde)
+    });
+
+    // Filtra duplicados e sem poster
+    combinados = combinados.filter((item, index, self) =>
+        item.poster_path &&
+        index === self.findIndex((t) => (t.id === item.id))
+    );
+
+    const container = section.querySelector('.container');
+    container.innerHTML = `<h2>Em Breve</h2>`;
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'carousel-wrapper';
+
+    const prev = document.createElement('button');
+    prev.className = 'carousel-btn prev';
+    prev.innerHTML = '<i class="fas fa-chevron-left"></i>';
+
+    const carousel = document.createElement('div');
+    carousel.className = 'carousel';
+
+    const next = document.createElement('button');
+    next.className = 'carousel-btn next';
+    next.innerHTML = '<i class="fas fa-chevron-right"></i>';
+
+    combinados.forEach(item => {
+        const dataBruta = item.release_date || item.first_air_date;
+        let dataFormatada = "EM BREVE";
+
+        if (dataBruta) {
+            const [ano, mes, dia] = dataBruta.split('-');
+            dataFormatada = `${dia}/${mes}`;
+        }
+
+        const poster = `https://image.tmdb.org/t/p/w500${item.poster_path}`;
+        const titulo = item.title || item.name;
+
+        const html = `
+        <a href="detalhes.html?id=${item.id}&type=${item.media_type}" class="content-card upcoming-card">
+            <div style="position: relative; width: 100%; height: 100%;">
+                <img src="${poster}" alt="${titulo}" loading="lazy" style="width:100%;height:100%;object-fit:cover;">
+                <div class="date-badge">ESTREIA: ${dataFormatada}</div>
+            </div>
+        </a>`;
+        carousel.innerHTML += html;
+    });
+
+    // Lógica de Scroll
+    prev.onclick = () => carousel.scrollBy({ left: -300, behavior: 'smooth' });
+    next.onclick = () => carousel.scrollBy({ left: 300, behavior: 'smooth' });
+
+    wrapper.append(prev, carousel, next);
+    container.appendChild(wrapper);
+}
+
+// --- FUNÇÃO TOP 10 CORRIGIDA (Layout Bonito) ---
+function renderTop10(sectionId, title, items) {
+    const section = document.getElementById(sectionId);
+    if (!section) return;
+
+    const container = section.querySelector('.container');
+    container.innerHTML = `<h2>${title}</h2>`;
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'carousel-wrapper top10-wrapper';
+
+    const prev = document.createElement('button');
+    prev.className = 'carousel-btn prev';
+    prev.innerHTML = '<i class="fas fa-chevron-left"></i>';
+
+    const carousel = document.createElement('div');
+    carousel.className = 'carousel';
+
+    const next = document.createElement('button');
+    next.className = 'carousel-btn next';
+    next.innerHTML = '<i class="fas fa-chevron-right"></i>';
+
+    items.forEach((item, index) => {
+        const rank = index + 1;
+        const poster = item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : 'images/favicon.png';
+        const link = `detalhes.html?id=${item.id}&type=${item.media_type || 'movie'}`;
+
+        const html = `
+        <div class="top10-card-container">
+            <span class="rank-number">${rank}</span>
+            <a href="${link}" class="content-card">
+                <img src="${poster}" alt="${item.title}" loading="lazy">
+            </a>
+        </div>`;
+        carousel.innerHTML += html;
+    });
+
+    prev.onclick = () => carousel.scrollBy({ left: -300, behavior: 'smooth' });
+    next.onclick = () => carousel.scrollBy({ left: 300, behavior: 'smooth' });
+
+    wrapper.append(prev, carousel, next);
+    container.appendChild(wrapper);
+}
+
+// --- FUNÇÃO EM BREVE (Com Setas e Tamanho Normal) ---
+function renderUpcomingCarousel(sectionId, title, items) {
+    const section = document.getElementById(sectionId);
+    if (!section) return;
+
+    const container = section.querySelector('.container');
+    container.innerHTML = `<h2>${title}</h2>`;
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'carousel-wrapper';
+
+    const carousel = document.createElement('div');
+    carousel.className = 'carousel';
+
+    items.forEach(item => {
+        let dataFormatada = "EM BREVE";
+        if (item.release_date) {
+            const parts = item.release_date.split('-');
+            dataFormatada = `${parts[2]}/${parts[1]}`;
+        }
+        const poster = item.poster_path ? `${IMG_BASE}${item.poster_path}` : 'images/favicon.png';
+
+        // Removemos o style inline de margin-right e usamos classe CSS
+        const html = `
+        <a href="detalhes.html?id=${item.id}&type=movie" class="content-card upcoming-card">
+            <div style="position: relative; width: 100%; height: 100%;">
+                <img src="${poster}" alt="${item.title}" loading="lazy" style="width:100%; height:100%; object-fit:cover;">
+                <div class="date-badge">ESTREIA: ${dataFormatada}</div>
+            </div>
+        </a>`;
+        carousel.innerHTML += html;
+    });
+
+    // --- ADICIONANDO AS SETAS ---
+    const prev = document.createElement('button');
+    prev.className = 'carousel-btn prev';
+    prev.innerHTML = '<i class="fas fa-chevron-left"></i>';
+    prev.onclick = () => carousel.scrollBy({ left: -300, behavior: 'smooth' });
+
+    const next = document.createElement('button');
+    next.className = 'carousel-btn next';
+    next.innerHTML = '<i class="fas fa-chevron-right"></i>';
+    next.onclick = () => carousel.scrollBy({ left: 300, behavior: 'smooth' });
+
+    wrapper.appendChild(prev);
+    wrapper.appendChild(carousel);
+    wrapper.appendChild(next);
+    container.appendChild(wrapper);
 }
 
 // --- FUNÇÕES DE CARREGAMENTO (COM TRAVA DE 500 PÁGINAS) ---
