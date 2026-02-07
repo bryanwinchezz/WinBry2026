@@ -360,6 +360,12 @@ header .container {
     font-size: 1.8rem;
     margin-bottom: var(--spacing-lg);
     margin-left: 80px;
+    /* Mantém alinhado com as setas */
+
+    /* ADICIONADO: Estilo da Linha Vermelha */
+    border-left: 5px solid var(--color-primary);
+    padding-left: 15px;
+    line-height: 1.2;
 }
 
 .carousel-wrapper {
@@ -1581,10 +1587,15 @@ body.light-mode .btn-lista {
 
     /* >>> GRID E CONTEÚDO <<< */
     .content-section h2 {
-        font-size: 1.4rem;
-        margin-left: 20px;
-        border-left: 4px solid var(--color-primary);
-        padding-left: 10px;
+        font-size: 1.8rem;
+        margin-bottom: var(--spacing-lg);
+        margin-left: 80px;
+        /* Mantém alinhado com as setas */
+
+        /* ADICIONADO: Estilo da Linha Vermelha */
+        border-left: 5px solid var(--color-primary);
+        padding-left: 15px;
+        line-height: 1.2;
     }
 
     /* Transformar Grids em Scroll Horizontal (Estilo Nativo de App) */
@@ -2288,4 +2299,61 @@ footer {
     font-size: 0.85rem;
     text-transform: uppercase;
     z-index: 10;
+}
+
+/* Wrapper para o item do histórico (para posicionar o botão) */
+.history-item-wrapper {
+    position: relative;
+    display: inline-block;
+    /* Garante que o wrapper tenha o tamanho do card no carrossel */
+    min-width: var(--card-width);
+    max-width: var(--card-width);
+    height: var(--card-height);
+    margin-right: 16px;
+    /* Espaço entre itens */
+}
+
+/* O botão X */
+.btn-remove-history {
+    position: absolute;
+    top: -10px;
+    right: -10px;
+    background-color: var(--color-primary);
+    color: white;
+    border: 2px solid #fff;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 200;
+    /* Fica acima do card */
+    font-size: 0.9rem;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+    transition: transform 0.2s, background 0.2s;
+}
+
+.btn-remove-history:hover {
+    background-color: #b0060f;
+    transform: scale(1.1);
+}
+
+/* Ajuste Mobile para o wrapper */
+@media (max-width: 768px) {
+    .history-item-wrapper {
+        min-width: 120px;
+        /* Tamanho mobile igual ao card */
+        max-width: 120px;
+        height: auto;
+        aspect-ratio: 2/3;
+    }
+
+    .btn-remove-history {
+        width: 25px;
+        height: 25px;
+        top: -5px;
+        right: -5px;
+    }
 }

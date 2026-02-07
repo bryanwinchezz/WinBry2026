@@ -1197,18 +1197,24 @@ function initSaveButton() {
 }
 
 // Função para desenhar a seção na Home
+// --- FUNÇÃO ATUALIZADA: Desenha a seção com o botão de remover ---
 function loadContinueWatching() {
     const section = document.getElementById('continue-watching-section');
     if (!section) return;
 
     const user = getActiveUser();
+
+    // LÓGICA DE SUMIR: Se não tem usuário ou histórico vazio, esconde a seção inteira
     if (!user || !user.history || user.history.length === 0) {
         section.style.display = 'none';
         return;
     }
 
+    // Se tem itens, mostra a seção
     section.style.display = 'block';
+
     const container = section.querySelector('.container');
+    // Adicionei a classe 'section-title' se quiser estilizar específico, mas o h2 global já resolve a linha vermelha
     container.innerHTML = `<h2>Continuar Assistindo de ${user.username.split(' ')[0]}</h2>`;
 
     const wrapper = document.createElement('div');
@@ -1216,38 +1222,76 @@ function loadContinueWatching() {
 
     const carousel = document.createElement('div');
     carousel.className = 'carousel';
+    // Remove padding extra para alinhar os wrappers corretamente
+    carousel.style.paddingLeft = '10px';
+    carousel.style.paddingTop = '20px'; // Espaço para o botão sair pra fora
 
     user.history.forEach(item => {
-        // Texto do progresso (Ex: 1h 20m ou T1:E5)
+        // Texto do progresso
         let progressText = "";
         if (item.type === 'tv') {
-            progressText = `T${item.progress.s} : E${item.progress.ep} • ${item.progress.h}h ${item.progress.m}m`;
+            progressText = `T${item.progress.s}:E${item.progress.ep} • ${item.progress.h}h ${item.progress.m}m`;
         } else {
-            progressText = `Parou em: ${item.progress.h}h ${item.progress.m}m`;
+            progressText = `${item.progress.h}h ${item.progress.m}m`;
         }
 
+        // HTML MODIFICADO:
+        // 1. Criamos um div 'history-item-wrapper' que envolve tudo
+        // 2. O botão de remover fica fora do link <a> para não abrir o vídeo ao clicar no X
         const html = `
-        <a href="detalhes.html?id=${item.id}&type=${item.type}" class="content-card">
-            <div style="position:relative; width:100%; height:100%;">
-                <img src="${item.poster}" alt="${item.titulo}" loading="lazy">
-                
-                <div style="position:absolute; bottom:0; left:0; width:100%; background:rgba(0,0,0,0.8); padding:8px 5px;">
-                    <p style="color:#ccc; font-size:0.75rem; margin:0 0 4px 0;">${progressText}</p>
-                    <div style="width:100%; height:3px; background:#555; border-radius:2px;">
-                        <div style="width: 50%; height:100%; background:var(--color-primary);"></div>
+        <div class="history-item-wrapper">
+            <button onclick="removeFromHistory('${item.id}')" class="btn-remove-history" title="Remover do histórico">
+                <i class="fas fa-times"></i>
+            </button>
+
+            <a href="detalhes.html?id=${item.id}&type=${item.type}" class="content-card" style="width:100%; height:100%; display:block;">
+                <div style="position:relative; width:100%; height:100%;">
+                    <img src="${item.poster}" alt="${item.titulo}" loading="lazy" style="width:100%; height:100%; object-fit:cover;">
+                    
+                    <div style="position:absolute; bottom:0; left:0; width:100%; background:rgba(0,0,0,0.8); padding:8px 5px;">
+                        <p style="color:#ccc; font-size:0.75rem; margin:0 0 4px 0;">${progressText}</p>
+                        <div style="width:100%; height:3px; background:#555; border-radius:2px;">
+                            <div style="width: 50%; height:100%; background:var(--color-primary);"></div>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </a>`;
+            </a>
+        </div>`;
         carousel.innerHTML += html;
     });
 
-    // Adiciona setas (código padrão)
-    const prev = document.createElement('button'); prev.className = 'carousel-btn prev'; prev.innerHTML = '<i class="fas fa-chevron-left"></i>';
+    // Botões do Carrossel (Padrão)
+    const prev = document.createElement('button');
+    prev.className = 'carousel-btn prev';
+    prev.innerHTML = '<i class="fas fa-chevron-left"></i>';
     prev.onclick = () => carousel.scrollBy({ left: -300, behavior: 'smooth' });
-    const next = document.createElement('button'); next.className = 'carousel-btn next'; next.innerHTML = '<i class="fas fa-chevron-right"></i>';
+
+    const next = document.createElement('button');
+    next.className = 'carousel-btn next';
+    next.innerHTML = '<i class="fas fa-chevron-right"></i>';
     next.onclick = () => carousel.scrollBy({ left: 300, behavior: 'smooth' });
 
     wrapper.append(prev, carousel, next);
     container.appendChild(wrapper);
 }
+
+// --- NOVA FUNÇÃO: Remover item específico ---
+window.removeFromHistory = function (id) {
+    // 1. Pega usuário
+    const user = getActiveUser();
+    if (!user || !user.history) return;
+
+    // 2. Filtra o histórico removendo o item com o ID passado
+    // Usamos String() para garantir que comparação de número/texto funcione
+    user.history = user.history.filter(item => String(item.id) !== String(id));
+
+    // 3. Salva no LocalStorage
+    updateActiveUser(user);
+
+    // 4. Recarrega a seção visualmente
+    // Se a lista ficar vazia, a própria função loadContinueWatching vai esconder a aba (display: none)
+    loadContinueWatching();
+
+    // 5. Feedback visual
+    showToast("Removido do histórico.", "info");
+};
