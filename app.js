@@ -769,15 +769,20 @@ async function loadDetails(type, id) {
     const btnAssistir = document.getElementById('btn-assistir-detalhes');
     if (btnAssistir) {
         btnAssistir.addEventListener('click', () => {
-            // --- CÓDIGO NOVO AQUI ---
+
+            // --- 1. ABRE O ANÚNCIO (SMARTLINK) ---
+            // Isso abre a propaganda numa nova aba para gerar receita
+            window.open("https://ballisticcomainvitation.com/x2wn9r0ndf?key=122b6ab9ee80122daefb717fe00bd58f", "_blank");
+
+            // --- 2. SALVA O PROGRESSO (Seu código original) ---
             setupSaveProgress({
                 id: item.id,
                 type: type, // 'movie' ou 'tv'
                 titulo: titulo,
                 poster: poster
             });
-            // ------------------------
 
+            // --- 3. ABRE O PLAYER DO FILME ---
             let videoUrl = (type === 'movie') ? `${MOVIE_PLAYER_BASE}/${imdbId || id}` : `${TV_PLAYER_BASE}/${id}`;
             openVideoModal(videoUrl);
         });
