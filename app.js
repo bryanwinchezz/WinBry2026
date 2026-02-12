@@ -161,36 +161,42 @@ async function fetchTMDB(endpoint) {
 }
 
 // =================================================================
-// ATUALIZAÇÃO DA HOME (Copie e substitua no app.js)
+// ATUALIZAÇÃO DA HOME (Misto de Filmes e Séries)
 // =================================================================
 
 async function loadHome() {
     console.log("Iniciando carregamento da Home...");
 
-    // 1. Destaque Principal
-    const trendingMovies = await fetchTMDB('/trending/movie/week');
-    if (trendingMovies?.results) {
-        setupHeroBanner(trendingMovies.results[0]);
-        // Top 10 Brasil
-        renderTop10('top10-section', 'Top 10 no Brasil Hoje', trendingMovies.results.slice(0, 10));
+    // 1. Destaque Principal + Top 10 (MISTO)
+    // Usamos o endpoint /trending/all/day para pegar o que está bombando HOJE (Filmes + Séries)
+    const trendingMixed = await fetchTMDB('/trending/all/day');
+
+    if (trendingMixed?.results) {
+        // --- MUDANÇA AQUI: Pega os 5 primeiros para o Banner Rotativo ---
+        const top5 = trendingMixed.results.slice(0, 5);
+        initHeroCarousel(top5);
+
+        // O Top 10 pega os 10 primeiros misturados
+        renderTop10('top10-section', 'Top 10 no Brasil Hoje', trendingMixed.results.slice(0, 10));
     }
 
-    // 2. Carregar Categorias (Novo Carrossel com Setas)
+    // 2. Carregar Categorias
     loadCategoriesCarousel();
 
-    // 3. Filmes Populares (Carrossel Padrão)
-    // Se isso não estava aparecendo, agora vai forçar
-    if (trendingMovies?.results) {
-        renderCarousel('filmes-populares-section', 'Filmes Populares', trendingMovies.results, 'movie');
+    // 3. Filmes Populares (Mantivemos separado para quem quer só filme)
+    const popularMovies = await fetchTMDB('/movie/popular');
+    if (popularMovies?.results) {
+        renderCarousel('filmes-populares-section', 'Filmes Populares', popularMovies.results, 'movie');
     }
 
-    // 4. Em Breve (Até o fim de 2026)
+    // 4. Em Breve (MISTO - Já vamos conferir a função abaixo)
     loadUnlimitedUpcoming();
 
-    // 5. Séries e Animes
+    // 5. Séries em Alta (Mantivemos separado para quem quer só série)
     const series = await fetchTMDB('/trending/tv/week');
     if (series?.results) renderCarousel('series-em-alta-section', 'Séries em Alta', series.results, 'tv');
 
+    // 6. Animes
     const animes = await fetchTMDB('/discover/tv?with_genres=16&with_original_language=ja&sort_by=popularity.desc');
     if (animes?.results) renderCarousel('animes-recomendados-section', 'Animes Recomendados', animes.results, 'tv');
 }
@@ -284,44 +290,46 @@ async function loadCategoriesCarousel() {
     btnNext.onclick = () => carouselInner.scrollBy({ left: 400, behavior: 'smooth' });
 }
 
-// --- FUNÇÃO: EM BREVE (ORDEM CRONOLÓGICA - DIA/MÊS) ---
+// --- FUNÇÃO: EM BREVE MISTO (FILMES E SÉRIES) ---
 async function loadUnlimitedUpcoming() {
     const sectionId = 'em-breve-section';
     const section = document.getElementById(sectionId);
     if (!section) return;
 
-    // Datas Dinâmicas
     const hoje = new Date().toISOString().split('T')[0];
-    const fim2026 = '2026-12-31';
+    const fimFuturo = '2026-12-31'; // Define até onde buscar
 
     // 1. Busca FILMES futuros
-    // Nota: removemos o sort_by da API aqui pois vamos ordenar manualmente no JS
-    const reqMovies = fetchTMDB(`/discover/movie?primary_release_date.gte=${hoje}&primary_release_date.lte=${fim2026}&page=1`);
+    const reqMovies = fetchTMDB(`/discover/movie?primary_release_date.gte=${hoje}&primary_release_date.lte=${fimFuturo}&sort_by=popularity.desc&page=1`);
 
-    // 2. Busca SÉRIES/ANIMES futuros
-    const reqTV = fetchTMDB(`/discover/tv?first_air_date.gte=${hoje}&first_air_date.lte=${fim2026}&page=1`);
+    // 2. Busca SÉRIES futuras (Novas temporadas ou estreias)
+    const reqTV = fetchTMDB(`/discover/tv?first_air_date.gte=${hoje}&first_air_date.lte=${fimFuturo}&sort_by=popularity.desc&page=1`);
 
-    // Aguarda os dois
     const [resMovies, resTV] = await Promise.all([reqMovies, reqTV]);
 
-    // Combina as listas
+    // 3. Combina e normaliza os dados
     let combinados = [];
+
     if (resMovies?.results) {
-        combinados = [...combinados, ...resMovies.results.map(i => ({ ...i, media_type: 'movie' }))];
+        combinados = [...combinados, ...resMovies.results.map(i => ({
+            ...i,
+            media_type: 'movie',
+            date_sort: i.release_date // Cria campo comum para ordenar
+        }))];
     }
+
     if (resTV?.results) {
-        combinados = [...combinados, ...resTV.results.map(i => ({ ...i, media_type: 'tv' }))];
+        combinados = [...combinados, ...resTV.results.map(i => ({
+            ...i,
+            media_type: 'tv',
+            date_sort: i.first_air_date // Cria campo comum para ordenar
+        }))];
     }
 
-    // 3. ORDENAÇÃO CRONOLÓGICA (O MAIS PRÓXIMO PRIMEIRO)
-    combinados.sort((a, b) => {
-        // Pega a data de cada um (Filme ou Série)
-        const dataA = new Date(a.release_date || a.first_air_date);
-        const dataB = new Date(b.release_date || b.first_air_date);
-        return dataA - dataB; // Do menor (mais cedo) para o maior (mais tarde)
-    });
+    // 4. Ordena por DATA (do mais próximo para o mais distante)
+    combinados.sort((a, b) => new Date(a.date_sort) - new Date(b.date_sort));
 
-    // Filtra duplicados e sem poster
+    // Filtra duplicados e itens sem imagem
     combinados = combinados.filter((item, index, self) =>
         item.poster_path &&
         index === self.findIndex((t) => (t.id === item.id))
@@ -345,28 +353,28 @@ async function loadUnlimitedUpcoming() {
     next.innerHTML = '<i class="fas fa-chevron-right"></i>';
 
     combinados.forEach(item => {
-        const dataBruta = item.release_date || item.first_air_date;
         let dataFormatada = "EM BREVE";
-
-        if (dataBruta) {
-            const [ano, mes, dia] = dataBruta.split('-');
+        if (item.date_sort) {
+            const [ano, mes, dia] = item.date_sort.split('-');
             dataFormatada = `${dia}/${mes}`;
         }
 
         const poster = `https://image.tmdb.org/t/p/w500${item.poster_path}`;
         const titulo = item.title || item.name;
 
+        // Badge diferenciado (opcional, mas ajuda a saber se é série ou filme)
+        const typeLabel = item.media_type === 'tv' ? 'SÉRIE' : 'FILME';
+
         const html = `
         <a href="detalhes.html?id=${item.id}&type=${item.media_type}" class="content-card upcoming-card">
             <div style="position: relative; width: 100%; height: 100%;">
                 <img src="${poster}" alt="${titulo}" loading="lazy" style="width:100%;height:100%;object-fit:cover;">
-                <div class="date-badge">ESTREIA: ${dataFormatada}</div>
+                <div class="date-badge">${dataFormatada}</div>
             </div>
         </a>`;
         carousel.innerHTML += html;
     });
 
-    // Lógica de Scroll
     prev.onclick = () => carousel.scrollBy({ left: -300, behavior: 'smooth' });
     next.onclick = () => carousel.scrollBy({ left: 300, behavior: 'smooth' });
 
@@ -802,16 +810,23 @@ function setupHeroBanner(item) {
     const heroLink = document.querySelector('.hero-content .btn-info');
     const heroBtn = document.getElementById('btn-open-player');
 
+    // Detecta se é filme ou série (o endpoint 'trending/all' traz essa info)
+    const type = item.media_type || 'movie';
+
     if (bannerImg) bannerImg.src = `${BANNER_BASE}${item.backdrop_path}`;
     if (heroTitle) heroTitle.innerText = item.title || item.name;
     if (heroDesc) heroDesc.innerText = item.overview ? item.overview.substring(0, 150) + "..." : "";
-    if (heroLink) heroLink.href = `detalhes.html?id=${item.id}&type=movie`;
+
+    // Link "Mais Informações" corrigido com o tipo certo
+    if (heroLink) heroLink.href = `detalhes.html?id=${item.id}&type=${type}`;
 
     if (heroBtn) {
         heroBtn.onclick = () => {
-            fetchTMDB(`/movie/${item.id}/external_ids`).then(ids => {
+            fetchTMDB(`/${type}/${item.id}/external_ids`).then(ids => {
                 const playId = ids.imdb_id || item.id;
-                openVideoModal(`${MOVIE_PLAYER_BASE}/${playId}`);
+                // Define a URL base correta dependendo do tipo
+                const playerBase = (type === 'tv') ? TV_PLAYER_BASE : MOVIE_PLAYER_BASE;
+                openVideoModal(`${playerBase}/${playId}`);
             });
         };
     }
@@ -1299,4 +1314,149 @@ window.removeFromHistory = function (id) {
 
     // 5. Feedback visual
     showToast("Removido do histórico.", "info");
+};
+
+// =================================================================
+// LÓGICA DO CARROSSEL HERO (COM BARRAS DE PROGRESSO)
+// =================================================================
+
+let heroInterval; // Variável global para controlar o timer
+
+function initHeroCarousel(items) {
+    const sliderContainer = document.getElementById('hero-slider');
+    const indicatorsContainer = document.getElementById('hero-indicators'); // Pegamos o container das barras
+    const prevBtn = document.getElementById('hero-prev');
+    const nextBtn = document.getElementById('hero-next');
+
+    if (!sliderContainer || items.length === 0) return;
+
+    // 1. Gera o HTML dos Slides
+    let slidesHTML = '';
+    let indicatorsHTML = '';
+
+    items.forEach((item, index) => {
+        const type = item.media_type || 'movie';
+        const titulo = item.title || item.name;
+        const sinopse = item.overview ? item.overview.substring(0, 150) + "..." : "";
+        const bg = item.backdrop_path ? `https://image.tmdb.org/t/p/original${item.backdrop_path}` : 'images/banner-filme.jpg';
+
+        const activeClass = index === 0 ? 'active' : '';
+
+        // Cria o Slide
+        slidesHTML += `
+        <div class="hero-slide ${activeClass}" data-index="${index}">
+            <img src="${bg}" alt="${titulo}">
+            <div class="container hero-content">
+                <h1>${titulo}</h1>
+                <p>${sinopse}</p>
+                <div class="hero-actions">
+                    <button class="btn btn-play" onclick="playHeroMovie('${item.id}', '${type}')">
+                        <i class="fas fa-play"></i> Assistir Agora
+                    </button>
+                    <a href="detalhes.html?id=${item.id}&type=${type}" class="btn btn-info">
+                        <i class="fas fa-info-circle"></i> Mais Informações
+                    </a>
+                </div>
+            </div>
+        </div>`;
+
+        // Cria a Barrinha de Progresso
+        // A div "indicator-fill" é quem vai animar
+        indicatorsHTML += `
+            <div class="indicator-bar ${activeClass}" onclick="goToSlide(${index})">
+                <span class="indicator-fill"></span>
+            </div>
+        `;
+    });
+
+    sliderContainer.innerHTML = slidesHTML;
+
+    // Se existir o container de indicadores, coloca o HTML lá
+    if (indicatorsContainer) {
+        indicatorsContainer.innerHTML = indicatorsHTML;
+    }
+
+    // 2. Lógica de Navegação
+    const slides = document.querySelectorAll('.hero-slide');
+    const bars = document.querySelectorAll('.indicator-bar');
+    let currentIndex = 0;
+    const totalSlides = slides.length;
+
+    // Função que muda visualmente o slide e a barra
+    const showSlide = (index) => {
+        // Remove active de todos (Slides e Barras)
+        slides.forEach(s => s.classList.remove('active'));
+        bars.forEach(b => {
+            b.classList.remove('active');
+            // Hack para reiniciar a animação CSS: clonar o elemento fill
+            // Isso força o navegador a começar a barra do zero sempre que muda
+            const fill = b.querySelector('.indicator-fill');
+            if (fill) {
+                fill.style.animation = 'none';
+                void fill.offsetWidth; // Força reflow (reinicia o render)
+                fill.style.animation = ''; // Remove o override para o CSS voltar a valer
+            }
+        });
+
+        // Adiciona no atual
+        slides[index].classList.add('active');
+
+        // Pequeno delay para garantir que o CSS entenda que mudou e inicie a animação
+        setTimeout(() => {
+            if (bars[index]) bars[index].classList.add('active');
+        }, 10);
+    };
+
+    const nextSlide = () => {
+        currentIndex = (currentIndex + 1) % totalSlides;
+        showSlide(currentIndex);
+    };
+
+    const prevSlide = () => {
+        currentIndex = (currentIndex - 1 + totalSlides) % totalSlides;
+        showSlide(currentIndex);
+    };
+
+    // Nova função global para clicar na barrinha e ir direto pro filme
+    window.goToSlide = (index) => {
+        currentIndex = index;
+        showSlide(currentIndex);
+        resetTimer();
+    };
+
+    // 3. Eventos dos Botões
+    if (nextBtn) nextBtn.onclick = () => {
+        nextSlide();
+        resetTimer();
+    };
+
+    if (prevBtn) prevBtn.onclick = () => {
+        prevSlide();
+        resetTimer();
+    };
+
+    // 4. Timer Automático (Sincronizado com o CSS de 5s)
+    const startTimer = () => {
+        // Limpa qualquer timer anterior para não encavalar
+        if (heroInterval) clearInterval(heroInterval);
+        heroInterval = setInterval(nextSlide, 5000); // 5000ms = 5 segundos
+    };
+
+    const resetTimer = () => {
+        clearInterval(heroInterval);
+        startTimer();
+    };
+
+    // Inicia tudo
+    startTimer();
+}
+
+// Função auxiliar para o botão assistir dentro do HTML gerado
+window.playHeroMovie = function (id, type) {
+    // Busca IDs externos (IMDB) se necessário
+    fetchTMDB(`/${type}/${id}/external_ids`).then(ids => {
+        const playId = ids.imdb_id || id;
+        const playerBase = (type === 'tv') ? TV_PLAYER_BASE : MOVIE_PLAYER_BASE;
+        openVideoModal(`${playerBase}/${playId}`);
+    });
 };

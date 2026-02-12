@@ -62,22 +62,13 @@
 
     <main>
         <section class="hero-banner">
-            <img src="images/banner-filme.png" alt="Destaque" class="banner-img">
-            <div class="container">
-                <div class="hero-content">
-                    <h1>Carregando Destaque...</h1>
-                    <p>Aguarde enquanto trazemos o melhor conteúdo para você.</p>
-
-                    <div class="hero-actions">
-                        <button id="btn-open-player" class="btn btn-play">
-                            <i class="fas fa-play"></i> Assistir Agora
-                        </button>
-                        <a href="#" class="btn btn-info">
-                            <i class="fas fa-info-circle"></i> Mais Informações
-                        </a>
-                    </div>
-                </div>
+            <div class="hero-slider" id="hero-slider">
             </div>
+
+            <button class="hero-arrow prev" id="hero-prev"><i class="fas fa-chevron-left"></i></button>
+            <button class="hero-arrow next" id="hero-next"><i class="fas fa-chevron-right"></i></button>
+
+            <div class="hero-indicators" id="hero-indicators"></div>
         </section>
 
         <section class="hubs-section">
