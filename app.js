@@ -171,7 +171,7 @@ async function loadHome() {
     // Usamos o endpoint /trending/all/day para pegar o que está bombando HOJE (Filmes + Séries)
     const trendingMixed = await fetchTMDB('/trending/all/day');
 
-    if (trendingMixed?.results) {
+    if (trendingMixed && trendingMixed.results) {
         // --- MUDANÇA AQUI: Pega os 5 primeiros para o Banner Rotativo ---
         const top5 = trendingMixed.results.slice(0, 5);
         initHeroCarousel(top5);
@@ -185,7 +185,7 @@ async function loadHome() {
 
     // 3. Filmes Populares (Mantivemos separado para quem quer só filme)
     const popularMovies = await fetchTMDB('/movie/popular');
-    if (popularMovies?.results) {
+    if (popularMovies && popularMovies.results) {
         renderCarousel('filmes-populares-section', 'Filmes Populares', popularMovies.results, 'movie');
     }
 
@@ -194,11 +194,11 @@ async function loadHome() {
 
     // 5. Séries em Alta (Mantivemos separado para quem quer só série)
     const series = await fetchTMDB('/trending/tv/week');
-    if (series?.results) renderCarousel('series-em-alta-section', 'Séries em Alta', series.results, 'tv');
+    if (series && series.results) renderCarousel('series-em-alta-section', 'Séries em Alta', series.results, 'tv');
 
     // 6. Animes
     const animes = await fetchTMDB('/discover/tv?with_genres=16&with_original_language=ja&sort_by=popularity.desc');
-    if (animes?.results) renderCarousel('animes-recomendados-section', 'Animes Recomendados', animes.results, 'tv');
+    if (animes && animes.results) renderCarousel('animes-recomendados-section', 'Animes Recomendados', animes.results, 'tv');
 }
 
 // --- NOVA FUNÇÃO: CATEGORIAS COM SETAS E MAIS OPÇÕES ---
@@ -251,7 +251,7 @@ async function loadCategoriesCarousel() {
     const promessas = categorias.map(async (cat) => {
         // Pega os filmes da categoria
         const data = await fetchTMDB(`/discover/${cat.type}?with_genres=${cat.id}&sort_by=popularity.desc&page=1`);
-        const results = data?.results || [];
+        const results = (data && data.results) ? data.results : [];
 
         // 2. Lógica de Seleção Única:
         // Procura na lista o primeiro filme que tenha imagem E que ainda não esteja no conjunto 'usedIds'
@@ -269,7 +269,7 @@ async function loadCategoriesCarousel() {
         }
 
         // Define o background usando o item escolhido
-        const bg = selectedItem?.backdrop_path
+        const bg = (selectedItem && selectedItem.backdrop_path)
             ? `https://image.tmdb.org/t/p/w500${selectedItem.backdrop_path}`
             : 'images/banner-filme.jpg';
 
@@ -310,7 +310,7 @@ async function loadUnlimitedUpcoming() {
     // 3. Combina e normaliza os dados
     let combinados = [];
 
-    if (resMovies?.results) {
+    if (resMovies && resMovies.results) {
         combinados = [...combinados, ...resMovies.results.map(i => ({
             ...i,
             media_type: 'movie',
@@ -318,7 +318,7 @@ async function loadUnlimitedUpcoming() {
         }))];
     }
 
-    if (resTV?.results) {
+    if (resTV && resTV.results) {
         combinados = [...combinados, ...resTV.results.map(i => ({
             ...i,
             media_type: 'tv',
@@ -698,15 +698,28 @@ async function loadDetails(type, id) {
     const imdbId = externalIds ? externalIds.imdb_id : null;
 
     let classificacao = "L";
+
     if (type === 'movie') {
+        // Lógica para FILMES
         const releases = await fetchTMDB(`/movie/${id}/release_dates`);
-        const br = releases?.results?.find(r => r.iso_3166_1 === 'BR');
-        if (br) classificacao = br.release_dates.find(d => d.certification)?.certification || "L";
+        if (releases && releases.results) {
+            const br = releases.results.find(r => r.iso_3166_1 === 'BR');
+            if (br && br.release_dates) {
+                const cert = br.release_dates.find(d => d.certification);
+                if (cert) classificacao = cert.certification;
+            }
+        }
     } else {
+        // Lógica para SÉRIES (Corrigido erro de variável)
         const ratings = await fetchTMDB(`/tv/${id}/content_ratings`);
-        const br = ratings?.results?.find(r => r.iso_3166_1 === 'BR');
-        if (br) classificacao = br.rating;
+
+        // Antes você usava "releases" aqui, o que dava erro. Agora está "ratings".
+        if (ratings && ratings.results) {
+            const br = ratings.results.find(r => r.iso_3166_1 === 'BR');
+            if (br) classificacao = br.rating;
+        }
     }
+
     const corClass = getRatingColor(parseInt(classificacao) || 0, classificacao);
 
     const bg = item.backdrop_path ? `${BANNER_BASE}${item.backdrop_path}` : 'images/banner-filme.jpg';
@@ -718,7 +731,6 @@ async function loadDetails(type, id) {
 
     // --- LÓGICA DO LER MAIS ---
     const sinopseTexto = item.overview || "Sinopse não disponível.";
-    // Se a sinopse for longa (> 150 caracteres), cortamos. Se não, mostramos normal.
     const isLongText = sinopseTexto.length > 150;
     const sinopseHtml = `
         <p class="synopsis-text ${isLongText ? 'clamped' : ''}" id="synopsis-content">${sinopseTexto}</p>
@@ -746,7 +758,8 @@ async function loadDetails(type, id) {
                         <span class="qualidade">HD</span>
                     </div>
                     
-                    ${sinopseHtml} <div class="actions">
+                    ${sinopseHtml} 
+                    <div class="actions">
                         <button class="btn btn-play" id="btn-assistir-detalhes"><i class="fas fa-play"></i> Assistir</button>
                         <button class="btn btn-lista" id="btn-add-lista"><i class="fas fa-bookmark"></i> Minha Lista</button>
                     </div>
@@ -756,7 +769,7 @@ async function loadDetails(type, id) {
         </div>`;
     }
 
-    // --- ATIVA O BOTÃO LER MAIS ---
+    // --- REATIVA OS BOTÕES (Ler Mais, Assistir, Lista) ---
     const btnReadMore = document.getElementById('btn-read-more');
     if (btnReadMore) {
         btnReadMore.addEventListener('click', () => {
@@ -774,23 +787,22 @@ async function loadDetails(type, id) {
             }
         });
     }
+
     const btnAssistir = document.getElementById('btn-assistir-detalhes');
     if (btnAssistir) {
         btnAssistir.addEventListener('click', () => {
-
-            // --- 1. ABRE O ANÚNCIO (SMARTLINK) ---
-            // Isso abre a propaganda numa nova aba para gerar receita
+            // Abre Anúncio
             window.open("https://ballisticcomainvitation.com/x2wn9r0ndf?key=122b6ab9ee80122daefb717fe00bd58f", "_blank");
 
-            // --- 2. SALVA O PROGRESSO (Seu código original) ---
+            // Salva Progresso
             setupSaveProgress({
                 id: item.id,
-                type: type, // 'movie' ou 'tv'
+                type: type,
                 titulo: titulo,
                 poster: poster
             });
 
-            // --- 3. ABRE O PLAYER DO FILME ---
+            // Abre Player
             let videoUrl = (type === 'movie') ? `${MOVIE_PLAYER_BASE}/${imdbId || id}` : `${TV_PLAYER_BASE}/${id}`;
             openVideoModal(videoUrl);
         });
@@ -925,7 +937,7 @@ function toggleMinhaLista(itemData, btn) {
 function updateListaButton(btn, itemId) {
     const user = getActiveUser();
     if (!user) return;
-    const exists = user.minhaLista?.some(i => String(i.id) === String(itemId));
+    const exists = (user.minhaLista && user.minhaLista.some(i => String(i.id) === String(itemId)));
     if (exists) {
         btn.innerHTML = '<i class="fas fa-check"></i> Na Lista';
         btn.classList.add('active');
