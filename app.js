@@ -12,6 +12,27 @@ const LANGUAGE = "&language=pt-BR";
 const MOVIE_PLAYER_BASE = "https://playerflixapi.com/filme";
 const TV_PLAYER_BASE = "https://playerflixapi.com/serie";
 
+// ⚠️ CONFIGURAÇÕES FIREBASE (Suas Chaves)
+const firebaseConfig = {
+    apiKey: "AIzaSyAL4eejSiJU7xhg7etuydqlEGq5fGP9hMU",
+    authDomain: "winbryplus.firebaseapp.com",
+    projectId: "winbryplus",
+    storageBucket: "winbryplus.firebasestorage.app",
+    messagingSenderId: "754571772845",
+    appId: "1:754571772845:web:ab12c0697aa14f35bc1724"
+};
+
+// Inicializa Firebase (Verifica se já existe para não dar erro)
+if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+}
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+// Variáveis Globais de Usuário
+let currentUser = null; // Usuário logado (Firebase Auth)
+let userData = null;    // Dados do banco (Lista, Histórico)
+
 // --- MAPA DAS MARCAS (CORRIGIDO) ---
 const BRAND_MAP = {
     // MARVEL: Usa | (ou) para pegar Marvel Studios (420) E Marvel Ent (7505)
@@ -46,23 +67,66 @@ let currentSearchQuery = '';
 let currentVideoContext = null; // Vai guardar qual filme está aberto no player
 
 // =================================================================
-// 1. SISTEMA DE USUÁRIO (LOCALSTORAGE)
+// 1. SISTEMA DE USUÁRIO (AGORA NA NUVEM ☁️)
 // =================================================================
 
-function getActiveUser() {
-    try {
-        const session = localStorage.getItem('winbry_active_session');
-        return session ? JSON.parse(session) : null;
-    } catch (e) { return null; }
-}
+auth.onAuthStateChanged(async (user) => {
 
-function updateActiveUser(userData) {
-    localStorage.setItem('winbry_active_session', JSON.stringify(userData));
-    const db = JSON.parse(localStorage.getItem('winbry_users_db')) || [];
-    const index = db.findIndex(u => u.email === userData.email);
-    if (index !== -1) {
-        db[index] = userData;
-        localStorage.setItem('winbry_users_db', JSON.stringify(db));
+    // Elementos dos botões flutuantes
+    const bryiaBtn = document.getElementById('bryia-fab');
+    const surpriseBtn = document.querySelector('.surpreenda-fab');
+
+    if (user) {
+        console.log("Usuário conectado:", user.email);
+        currentUser = user;
+
+        // --- MOSTRA OS BOTÕES FLUTUANTES ---
+        if (bryiaBtn) bryiaBtn.style.display = 'flex';
+        if (surpriseBtn) surpriseBtn.style.display = 'flex';
+
+        // Pega os dados do banco (Minha Lista, etc)
+        const doc = await db.collection('users').doc(user.uid).get();
+        if (doc.exists) {
+            userData = doc.data();
+        } else {
+            // Se for novo usuário no banco, cria o documento inicial
+            userData = {
+                username: user.displayName || "Usuário",
+                email: user.email,
+                minhaLista: [],
+                history: []
+            };
+            await db.collection('users').doc(user.uid).set(userData);
+        }
+    } else {
+        console.log("Nenhum usuário conectado.");
+        currentUser = null;
+        userData = null;
+
+        // --- ESCONDE OS BOTÕES FLUTUANTES ---
+        if (bryiaBtn) bryiaBtn.style.display = 'none';
+        if (surpriseBtn) surpriseBtn.style.display = 'none';
+    }
+
+    // Atualiza a interface (Botão de Perfil/Login)
+    initHeaderUser();
+
+    // Se estiver na página "Minha Lista" ou "Home", recarrega
+    if (window.location.pathname.includes('minha-lista') && typeof initMinhaListaPage === 'function') initMinhaListaPage();
+    if (window.location.pathname.includes('index') && typeof loadContinueWatching === 'function') loadContinueWatching();
+});
+
+// Helper para salvar dados no banco automaticamente
+async function saveUserDataToCloud() {
+    if (!currentUser || !userData) return;
+    try {
+        await db.collection('users').doc(currentUser.uid).update({
+            minhaLista: userData.minhaLista,
+            history: userData.history,
+            profileImage: userData.profileImage || null
+        });
+    } catch (error) {
+        console.error("Erro ao salvar:", error);
     }
 }
 
@@ -79,6 +143,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 100);
     }
 
+    initGlobalLoader();
     initTheme();
     initMenuMobile();
     initSearch();
@@ -87,6 +152,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initTransitionManager();
     initSaveButton();
     loadContinueWatching();
+    initEsqueciSenha();
 
     if (document.getElementById("cadastroForm")) initCadastro(document.getElementById("cadastroForm"));
     if (document.getElementById("loginForm")) initLogin(document.getElementById("loginForm"));
@@ -915,129 +981,201 @@ function initTransitionManager() {
     });
 }
 
-function toggleMinhaLista(itemData, btn) {
-    const user = getActiveUser();
-    if (!user) return showToast("Faça login para salvar!", "error");
+// =================================================================
+// LOGIN COM GOOGLE
+// ================================================================
 
-    if (!user.minhaLista) user.minhaLista = [];
-    const index = user.minhaLista.findIndex(i => String(i.id) === String(itemData.id));
+function initGoogleLogin() {
+    const btn = document.getElementById('btn-google-login');
+    if (!btn) return;
 
-    if (index !== -1) {
-        user.minhaLista.splice(index, 1);
-        showToast("Removido da Minha Lista", "info");
-    } else {
-        user.minhaLista.push(itemData);
-        showToast("Adicionado à Minha Lista", "success");
-    }
+    btn.onclick = async () => {
+        const provider = new firebase.auth.GoogleAuthProvider();
 
-    updateActiveUser(user);
-    if (btn) updateListaButton(btn, itemData.id);
+        try {
+            showToast("Conectando ao Google...", "info");
+
+            // Abre o Popup do Google
+            const result = await auth.signInWithPopup(provider);
+            const user = result.user;
+
+            // Verifica/Cria usuário no Banco
+            const userDoc = await db.collection('users').doc(user.uid).get();
+
+            if (!userDoc.exists) {
+                await db.collection('users').doc(user.uid).set({
+                    username: user.displayName,
+                    email: user.email,
+                    profileImage: user.photoURL,
+                    minhaLista: [],
+                    history: []
+                });
+                showToast("Conta criada! Redirecionando...", "success");
+            } else {
+                showToast(`Bem-vindo, ${user.displayName}!`, "success");
+            }
+
+            // Animação de saída antes de redirecionar
+            const box = document.querySelector('.auth-box');
+            if (box) box.style.transform = "scale(0.9) translateY(-20px)";
+            if (box) box.style.opacity = "0";
+
+            setTimeout(() => window.location.href = 'index.html', 1500);
+
+        } catch (error) {
+            console.error("ERRO DETALHADO GOOGLE:", error);
+
+            // TRADUÇÃO DE ERROS COMUNS DO GOOGLE AUTH
+            let msg = "Erro ao entrar com Google.";
+
+            if (error.code === 'auth/popup-closed-by-user') {
+                msg = "Você fechou a janela do Google antes de terminar.";
+            } else if (error.code === 'auth/cancelled-popup-request') {
+                msg = "Muitas janelas abertas. Tente de novo.";
+            } else if (error.code === 'auth/popup-blocked') {
+                msg = "O navegador bloqueou o Popup. Permita popups para este site.";
+            } else if (error.code === 'auth/unauthorized-domain') {
+                msg = "Domínio não autorizado no Firebase. Configure no Console.";
+            } else if (error.code === 'auth/operation-not-allowed') {
+                msg = "Login Google não está ativado no painel do Firebase.";
+            }
+
+            showToast(msg, "error");
+        }
+    };
 }
 
-function updateListaButton(btn, itemId) {
-    const user = getActiveUser();
-    if (!user) return;
-    const exists = (user.minhaLista && user.minhaLista.some(i => String(i.id) === String(itemId)));
-    if (exists) {
-        btn.innerHTML = '<i class="fas fa-check"></i> Na Lista';
-        btn.classList.add('active');
-        btn.style.backgroundColor = '#4CAF50';
-    } else {
-        btn.innerHTML = '<i class="fas fa-bookmark"></i> Minha Lista';
-        btn.classList.remove('active');
-        btn.style.backgroundColor = '';
-    }
-}
+function initMinhaConta() {
+    console.log("Iniciando Minha Conta...");
 
-function initMinhaListaPage() {
-    const container = document.getElementById('lista-container');
-    if (!container) return;
+    // FUNÇÃO INTERNA: Atualiza a tela com os dados reais
+    const updateUI = () => {
+        if (currentUser && userData) {
+            const nomeEl = document.getElementById('display-username');
+            const emailEl = document.getElementById('display-email');
+            const imgEl = document.getElementById('profile-pic');
 
-    const user = getActiveUser();
+            if (nomeEl) nomeEl.innerText = userData.username || currentUser.displayName || "Usuário";
+            if (emailEl) emailEl.innerText = currentUser.email || "";
+            // Foto vem do Google ou do Upload local (prioridade para local se houver, senão Google)
+            if (imgEl) imgEl.src = userData.profileImage || currentUser.photoURL || 'images/foto-generica.jpg';
+        }
+    };
 
-    if (!user || !user.minhaLista || user.minhaLista.length === 0) {
-        container.classList.remove('content-grid');
-        container.style.display = 'flex';
-        container.style.justifyContent = 'center';
-        container.style.alignItems = 'center';
-        container.style.minHeight = '300px';
+    updateUI();
 
-        container.innerHTML = `
-            <div class="empty-state" style="text-align: center;">
-                <i class="fas fa-film" style="font-size: 3rem; margin-bottom: 20px; color: #333;"></i>
-                <h3>Sua lista está vazia.</h3>
-                <p style="color: #666;">Adicione filmes e séries para assistir mais tarde.</p>
-            </div>`;
-        return;
-    }
-
-    container.classList.add('content-grid');
-    container.style.display = 'grid';
-    container.style.removeProperty('justify-content');
-    container.style.removeProperty('align-items');
-
-    let html = '';
-    user.minhaLista.forEach(item => {
-        html += `
-        <div class="content-card-wrapper">
-             <a href="detalhes.html?id=${item.id}&type=${item.type}" class="content-card">
-                <img src="${item.poster}" alt="${item.titulo}">
-                <div class="card-info">
-                    <h3>${item.titulo}</h3>
-                </div>
-            </a>
-            <button onclick="removeItemLista('${item.id}')" class="btn-remove-lista">
-                <i class="fas fa-trash"></i> Remover
-            </button>
-        </div>`;
-    });
-    container.innerHTML = html;
-}
-
-window.removeItemLista = function (id) {
-    const user = getActiveUser();
-    if (!user) return;
-    const index = user.minhaLista.findIndex(i => String(i.id) === String(id));
-    if (index !== -1) {
-        user.minhaLista.splice(index, 1);
-        updateActiveUser(user);
-        initMinhaListaPage();
-        showToast("Item removido.", "info");
-    }
-}
-
-function initCadastro(form) {
-    form.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const nome = document.getElementById('nome').value;
-        const email = document.getElementById('email').value.trim();
-        const senha = document.getElementById('senha').value;
-        const confirmar = document.getElementById('confirmar-senha').value;
-        if (senha !== confirmar) return showToast("Senhas não conferem!", "error");
-        const db = JSON.parse(localStorage.getItem('winbry_users_db')) || [];
-        if (db.find(u => u.email === email)) return showToast("Email já cadastrado!", "error");
-        db.push({ username: nome, email, password: senha, minhaLista: [] });
-        localStorage.setItem('winbry_users_db', JSON.stringify(db));
-        showToast("Conta criada com sucesso!", "success");
-        setTimeout(() => window.location.href = 'login.html', 1500);
-    });
-}
-
-function initLogin(form) {
-    form.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const email = document.getElementById('email').value.trim();
-        const senha = document.getElementById('senha').value;
-        const db = JSON.parse(localStorage.getItem('winbry_users_db')) || [];
-        const user = db.find(u => u.email === email && u.password === senha);
+    auth.onAuthStateChanged((user) => {
         if (user) {
-            updateActiveUser(user);
-            showToast("Login realizado!", "success");
-            setTimeout(() => window.location.href = 'index.html', 1000);
-        } else {
-            showToast("Dados incorretos.", "error");
+            currentUser = user; // Atualiza global
+            setTimeout(updateUI, 500);
         }
     });
+
+    // --- LÓGICA DE BOTÕES ---
+
+    // Sair
+    const btnLogout = document.querySelector('.btn-logout');
+    if (btnLogout) {
+        btnLogout.onclick = () => {
+            auth.signOut();
+            showToast("Saiu da conta.", "info");
+            setTimeout(() => window.location.href = 'login.html', 1000);
+        };
+    }
+
+    // Upload de Foto (Opcional, pois Google já traz foto)
+    const upload = document.getElementById('upload-pic');
+    if (upload) upload.onchange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = async (ev) => {
+                const base64 = ev.target.result;
+                // Salva no Firestore
+                userData.profileImage = base64;
+                await db.collection('users').doc(currentUser.uid).update({
+                    profileImage: base64
+                });
+                updateUI();
+                initHeaderUser();
+                showToast("Foto atualizada!", "success");
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    // --- MODAL: EDITAR PERFIL (APENAS NOME) ---
+    const btnEdit = document.getElementById('btn-edit-profile');
+    const modal = document.getElementById('edit-profile-modal');
+    const btnCancel = document.getElementById('btn-cancel-edit');
+    const formEdit = document.getElementById('editProfileForm');
+
+    if (btnEdit && modal) {
+        // ABRIR POP-UP
+        btnEdit.onclick = () => {
+            // Preenche apenas o nome
+            document.getElementById('edit-name').value = userData?.username || currentUser.displayName || "";
+            modal.classList.add('active');
+        };
+
+        // FECHAR POP-UP
+        btnCancel.onclick = () => modal.classList.remove('active');
+
+        // SALVAR DADOS
+        formEdit.onsubmit = async (e) => {
+            e.preventDefault();
+
+            const newName = document.getElementById('edit-name').value.trim();
+
+            if (newName === (userData.username || currentUser.displayName)) {
+                return showToast("Nenhuma alteração detectada.", "info");
+            }
+
+            showToast("Atualizando perfil...", "info");
+
+            try {
+                // 1. Atualiza no Banco de Dados
+                await db.collection('users').doc(currentUser.uid).update({
+                    username: newName
+                });
+
+                // 2. Tenta atualizar no Auth do Google (apenas visual local)
+                try { await currentUser.updateProfile({ displayName: newName }); } catch (err) { console.log("Info: Auth profile update skipped"); }
+
+                // 3. Atualização Local
+                userData.username = newName;
+
+                updateUI();
+                initHeaderUser(); // Atualiza o topo do site também
+                modal.classList.remove('active');
+
+                showToast("Nome atualizado com sucesso!", "success");
+
+            } catch (error) {
+                console.error("Erro ao atualizar:", error);
+                showToast("Erro ao salvar alterações.", "error");
+            }
+        };
+    }
+}
+
+function initHeaderUser() {
+    const btn = document.getElementById('user-action');
+    if (!btn) return;
+    if (currentUser) {
+        const img = userData?.profileImage || 'images/favicon.png';
+        const nome = userData?.username?.split(' ')[0] || 'Perfil';
+        btn.innerHTML = `<img src="${img}" style="width:28px;height:28px;border-radius:50%;margin-right:8px;object-fit:cover;"> ${nome}`;
+        btn.href = 'minha-conta.html';
+        btn.classList.remove('btn-primary');
+        btn.style.display = 'flex';
+        btn.style.alignItems = 'center';
+    } else {
+        btn.innerHTML = 'Entrar';
+        btn.href = 'login.html';
+        btn.classList.add('btn-primary');
+        btn.style.display = '';
+    }
 }
 
 function initSearch() {
@@ -1087,54 +1225,6 @@ function initSearch() {
 
     if (input) {
         input.onkeypress = (e) => { if (e.key === 'Enter') go(); };
-    }
-}
-
-function initMinhaConta() {
-    const user = getActiveUser();
-    if (!user) return window.location.href = 'login.html';
-    const elUser = document.getElementById('display-username');
-    const elEmail = document.getElementById('display-email');
-    const elImg = document.getElementById('profile-pic');
-    if (elUser) elUser.innerText = user.username;
-    if (elEmail) elEmail.innerText = user.email;
-    if (elImg && user.profileImage) elImg.src = user.profileImage;
-    const upload = document.getElementById('upload-pic');
-    if (upload) upload.onchange = (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                user.profileImage = ev.target.result;
-                updateActiveUser(user);
-                elImg.src = ev.target.result;
-                initHeaderUser();
-                showToast("Foto atualizada!", "success");
-            };
-            reader.readAsDataURL(file);
-        }
-    };
-    const btnLogout = document.querySelector('.btn-logout');
-    if (btnLogout) btnLogout.onclick = () => {
-        localStorage.removeItem('winbry_active_session');
-        showToast("Saindo...", "info");
-        setTimeout(() => window.location.href = 'login.html', 1000);
-    };
-}
-
-function initHeaderUser() {
-    const btn = document.getElementById('user-action');
-    if (!btn) return;
-    const user = getActiveUser();
-    if (user) {
-        const nome = user.username.split(' ')[0];
-        const img = user.profileImage || 'images/favicon.png';
-        btn.innerHTML = `<img src="${img}" style="width:28px;height:28px;border-radius:50%;margin-right:8px;object-fit:cover;"> ${nome}`;
-        btn.href = 'minha-conta.html';
-        btn.classList.remove('btn-primary');
-        btn.style.display = 'flex'; btn.style.alignItems = 'center'; btn.style.backgroundColor = 'transparent'; btn.style.border = '1px solid #333';
-    } else {
-        btn.innerHTML = 'Entrar'; btn.href = 'login.html'; btn.classList.add('btn-primary'); btn.style.backgroundColor = ''; btn.style.border = '';
     }
 }
 
@@ -1190,107 +1280,111 @@ function setupSaveProgress(itemData) {
     }
 }
 
-// Ativa o botão de salvar (Chame isso no initVideoModal ou no DOMContentLoaded)
+// Funções Atualizadas para Cloud
+
+function toggleMinhaLista(item, btn) {
+    if (!currentUser || !userData) return showToast("Faça login para salvar!", "error");
+
+    const list = userData.minhaLista || [];
+    const exists = list.find(i => String(i.id) === String(item.id));
+
+    if (exists) {
+        userData.minhaLista = list.filter(i => String(i.id) !== String(item.id));
+        showToast("Removido da Lista", "info");
+    } else {
+        userData.minhaLista.push(item);
+        showToast("Adicionado à Lista", "success");
+    }
+
+    updateListaButton(btn, item.id);
+    saveUserDataToCloud(); // Salva na nuvem
+}
+
+function updateListaButton(btn, id) {
+    if (!userData || !btn) return;
+    const exists = userData.minhaLista?.some(i => String(i.id) === String(id));
+    if (exists) {
+        btn.innerHTML = '<i class="fas fa-check"></i> Na Lista';
+        btn.classList.add('active');
+        btn.style.backgroundColor = '#4CAF50';
+    } else {
+        btn.innerHTML = '<i class="fas fa-bookmark"></i> Minha Lista';
+        btn.classList.remove('active');
+        btn.style.backgroundColor = '';
+    }
+}
+
+function initMinhaListaPage() {
+    const container = document.getElementById('lista-container');
+    if (!container) return;
+
+    if (!userData || !userData.minhaLista || !userData.minhaLista.length) {
+        container.innerHTML = `<div class="empty-state">
+            <i class="fas fa-film" style="font-size: 3rem; margin-bottom: 20px; color: #333;"></i>
+            <h3>Sua lista está vazia.</h3>
+        </div>`;
+        return;
+    }
+
+    container.innerHTML = userData.minhaLista.map(item => `
+    <div class="content-card-wrapper">
+        <a href="detalhes.html?id=${item.id}&type=${item.type}" class="content-card">
+            <img src="${item.poster}" loading="lazy">
+            <div class="card-info"><h3>${item.titulo}</h3></div>
+        </a>
+        <button onclick="removeItemLista('${item.id}')" class="btn-remove-lista"><i class="fas fa-trash"></i> Remover</button>
+    </div>`).join('');
+}
+
+window.removeItemLista = function (id) {
+    if (!userData) return;
+    userData.minhaLista = userData.minhaLista.filter(i => String(i.id) !== String(id));
+    saveUserDataToCloud();
+    initMinhaListaPage();
+    showToast("Item removido.", "info");
+};
+
 function initSaveButton() {
     const btn = document.getElementById('save-progress-btn');
     if (!btn) return;
-
     btn.onclick = () => {
-        if (!currentVideoContext) return;
+        if (!currentUser) return showToast("Faça login!", "error");
 
-        const user = getActiveUser();
-        if (!user) return showToast("Faça login para salvar progresso!", "error");
-
-        if (!user.history) user.history = [];
-
-        // Pega os valores dos inputs
         const h = document.getElementById('stop-hour').value || 0;
         const m = document.getElementById('stop-min').value || 0;
         const s = document.getElementById('current-season').value || 1;
         const ep = document.getElementById('current-episode').value || 1;
 
-        // Remove entrada antiga se existir
-        const index = user.history.findIndex(h => String(h.id) === String(currentVideoContext.id));
-        if (index !== -1) user.history.splice(index, 1);
+        if (!userData.history) userData.history = [];
+        // Remove anterior e adiciona novo no topo
+        userData.history = userData.history.filter(i => String(i.id) !== String(currentVideoContext.id));
+        userData.history.unshift({ ...currentVideoContext, progress: { h, m, s, ep } });
 
-        // Adiciona novo histórico no TOPO da lista
-        user.history.unshift({
-            ...currentVideoContext,
-            timestamp: new Date().getTime(),
-            progress: { h, m, s, ep }
-        });
-
-        updateActiveUser(user);
-        showToast("Progresso salvo!", "success");
-
-        // Recarrega a seção na home se estiver lá
+        saveUserDataToCloud();
+        showToast("Progresso salvo na nuvem!", "success");
         loadContinueWatching();
     };
 }
 
-// Função para desenhar a seção na Home
-// --- FUNÇÃO ATUALIZADA: Desenha a seção com o botão de remover ---
 function loadContinueWatching() {
     const section = document.getElementById('continue-watching-section');
-    if (!section) return;
-
-    const user = getActiveUser();
-
-    // LÓGICA DE SUMIR: Se não tem usuário ou histórico vazio, esconde a seção inteira
-    if (!user || !user.history || user.history.length === 0) {
-        section.style.display = 'none';
+    if (!section || !userData?.history?.length) {
+        if (section) section.style.display = 'none';
         return;
     }
-
-    // Se tem itens, mostra a seção
     section.style.display = 'block';
-
-    const container = section.querySelector('.container');
-    // Adicionei a classe 'section-title' se quiser estilizar específico, mas o h2 global já resolve a linha vermelha
-    container.innerHTML = `<h2>Continuar Assistindo de ${user.username.split(' ')[0]}</h2>`;
-
-    const wrapper = document.createElement('div');
-    wrapper.className = 'carousel-wrapper';
-
-    const carousel = document.createElement('div');
-    carousel.className = 'carousel';
-    // Remove padding extra para alinhar os wrappers corretamente
-    carousel.style.paddingLeft = '10px';
-    carousel.style.paddingTop = '20px'; // Espaço para o botão sair pra fora
-
-    user.history.forEach(item => {
-        // Texto do progresso
-        let progressText = "";
-        if (item.type === 'tv') {
-            progressText = `T${item.progress.s}:E${item.progress.ep} • ${item.progress.h}h ${item.progress.m}m`;
-        } else {
-            progressText = `${item.progress.h}h ${item.progress.m}m`;
-        }
-
-        // HTML MODIFICADO:
-        // 1. Criamos um div 'history-item-wrapper' que envolve tudo
-        // 2. O botão de remover fica fora do link <a> para não abrir o vídeo ao clicar no X
-        const html = `
+    section.querySelector('.container').innerHTML = `<h2>Continuar Assistindo (${userData.username})</h2>
+    <div class="carousel-wrapper"><div class="carousel">${userData.history.map(item => `
         <div class="history-item-wrapper">
-            <button onclick="removeFromHistory('${item.id}')" class="btn-remove-history" title="Remover do histórico">
-                <i class="fas fa-times"></i>
-            </button>
-
-            <a href="detalhes.html?id=${item.id}&type=${item.type}" class="content-card" style="width:100%; height:100%; display:block;">
-                <div style="position:relative; width:100%; height:100%;">
-                    <img src="${item.poster}" alt="${item.titulo}" loading="lazy" style="width:100%; height:100%; object-fit:cover;">
-                    
-                    <div style="position:absolute; bottom:0; left:0; width:100%; background:rgba(0,0,0,0.8); padding:8px 5px;">
-                        <p style="color:#ccc; font-size:0.75rem; margin:0 0 4px 0;">${progressText}</p>
-                        <div style="width:100%; height:3px; background:#555; border-radius:2px;">
-                            <div style="width: 50%; height:100%; background:var(--color-primary);"></div>
-                        </div>
-                    </div>
+            <button onclick="removeFromHistory('${item.id}')" class="btn-remove-history"><i class="fas fa-times"></i></button>
+            <a href="detalhes.html?id=${item.id}&type=${item.type}" class="content-card">
+                <img src="${item.poster}" loading="lazy">
+                <div style="position:absolute;bottom:0;background:rgba(0,0,0,0.8);width:100%;padding:5px;font-size:0.8rem;color:#ccc;">
+                    ${item.type === 'tv' ? `T${item.progress.s}:E${item.progress.ep}` : ''} ${item.progress.h}h ${item.progress.m}m
                 </div>
             </a>
-        </div>`;
-        carousel.innerHTML += html;
-    });
+        </div>`).join('')
+        }</div></div>`;
 
     // Botões do Carrossel (Padrão)
     const prev = document.createElement('button');
@@ -1306,6 +1400,14 @@ function loadContinueWatching() {
     wrapper.append(prev, carousel, next);
     container.appendChild(wrapper);
 }
+
+window.removeFromHistory = function (id) {
+    if (!userData) return;
+    userData.history = userData.history.filter(i => String(i.id) !== String(id));
+    saveUserDataToCloud();
+    loadContinueWatching();
+    showToast("Removido.", "info");
+};
 
 // --- NOVA FUNÇÃO: Remover item específico ---
 window.removeFromHistory = function (id) {
@@ -1472,3 +1574,455 @@ window.playHeroMovie = function (id, type) {
         openVideoModal(`${playerBase}/${playId}`);
     });
 };
+
+// =================================================================
+//  MÓDULO DE SISTEMA (Gerencia Chaves e Configurações)
+// =================================================================
+const System = {
+    saveKey(key) {
+        if (!key || key.trim() === "") return false;
+        localStorage.setItem('winbry_gemini_key', key.trim());
+        return true;
+    },
+
+    getKey() {
+        return localStorage.getItem('winbry_gemini_key');
+    },
+
+    initSettings() {
+        const input = document.getElementById('user-api-key');
+        const btn = document.getElementById('btn-save-key');
+
+        if (input && btn) {
+            const current = this.getKey();
+            if (current) input.value = current;
+
+            btn.onclick = () => {
+                if (this.saveKey(input.value)) {
+                    showToast("Chave API salva com sucesso!", "success");
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    showToast("Por favor, insira uma chave válida.", "error");
+                }
+            };
+        }
+    }
+};
+
+// =================================================================
+//  MÓDULO BRY.IA (Inteligência Artificial)
+// =================================================================
+const BryIA = {
+    elements: {
+        fab: document.getElementById('bryia-fab'),
+        window: document.getElementById('bryia-window'),
+        close: document.getElementById('close-bryia'),
+        send: document.getElementById('bryia-send'),
+        input: document.getElementById('bryia-input'),
+        msgs: document.getElementById('bryia-messages')
+    },
+
+    init() {
+        if (!this.elements.fab) return;
+        this.elements.fab.onclick = () => this.elements.window.classList.toggle('active');
+        if (this.elements.close) this.elements.close.onclick = () => this.elements.window.classList.remove('active');
+        this.elements.send.onclick = () => this.sendMessage();
+        this.elements.input.onkeypress = (e) => { if (e.key === 'Enter') this.sendMessage(); };
+    },
+
+    async sendMessage() {
+        const text = this.elements.input.value.trim();
+        if (!text) return;
+
+        this.appendMsg(text, 'user');
+        this.elements.input.value = '';
+
+        const key = System.getKey();
+        if (!key) {
+            this.appendMsg("⚠️ Configure sua API Key em 'Minha Conta'.", 'bot');
+            return;
+        }
+
+        const loadingId = this.appendMsg("Pensando...", 'bot', true);
+
+        try {
+            const reply = await this.callGemini(text, key);
+            const loadEl = document.getElementById(loadingId);
+            if (loadEl) loadEl.remove();
+            await this.processResponse(reply);
+        } catch (error) {
+            const loadEl = document.getElementById(loadingId);
+            if (loadEl) loadEl.remove();
+
+            // Tratamento Elegante de Erros
+            if (error.message.includes('429')) {
+                this.appendMsg("😴 Atingi meu limite de pensamentos por agora. Tente daqui a pouco!", 'bot');
+            } else {
+                console.error("BryIA Error:", error);
+                this.appendMsg(`Erro: ${error.message}`, 'bot');
+            }
+        }
+    },
+
+    async callGemini(prompt, key) {
+        const modelName = "gemini-2.5-flash";
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`;
+
+        // --- CONTEXTO INTELIGENTE (LÊ A TELA) ---
+        let contextoPagina = "";
+
+        // Verifica se está vendo um filme/série
+        const tituloNaTela = document.querySelector('.info-text h1');
+        if (tituloNaTela) {
+            const titulo = tituloNaTela.innerText;
+            const nota = document.querySelector('.star-rating')?.innerText || "N/A";
+            const sinopse = document.querySelector('#synopsis-content')?.innerText || "";
+
+            contextoPagina = `
+            CONTEXTO ATUAL: O usuário está na página de detalhes assistindo: "${titulo}".
+            Nota do filme: ${nota}.
+            Sinopse na tela: "${sinopse.substring(0, 100)}...".
+            Se o usuário perguntar "é bom?", "quanto dura?" ou "tem continuação?", refira-se a ESTE título.
+            `;
+        } else if (window.location.pathname.includes('minha-lista')) {
+            contextoPagina = "CONTEXTO ATUAL: O usuário está olhando a 'Minha Lista'.";
+        }
+
+        const systemInstruction = `
+        Você é a BryIA, a assistente cinéfila do WinBry+.
+        Use emojis 🍿🎬. Respostas curtas e diretas.
+        
+        ${contextoPagina}
+        
+        REGRA: Quando sugerir filmes, use SEMPRE o formato: [BUSCA:Nome do Filme].
+        `;
+
+        const payload = {
+            contents: [{
+                parts: [{
+                    text: `${systemInstruction}\n\nUsuário: ${prompt}\nBryIA:`
+                }]
+            }]
+        };
+
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            // Identifica erro de limite (429)
+            if (response.status === 429) throw new Error("429 - Limite Atingido");
+            if (response.status === 404) throw new Error("Modelo não disponível na sua conta.");
+            throw new Error(data.error?.message || "Erro na API");
+        }
+
+        return data.candidates[0].content.parts[0].text;
+    },
+
+    async processResponse(text) {
+        const searchRegex = /\[BUSCA:(.*?)\]/g;
+        let cleanText = text.replace(searchRegex, "<b>$1</b>");
+        this.appendMsg(cleanText, 'bot');
+
+        let match;
+        while ((match = searchRegex.exec(text)) !== null) {
+            await this.searchAndCreateCard(match[1]);
+        }
+    },
+
+    async searchAndCreateCard(query) {
+        const data = await fetchTMDB(`/search/multi?query=${encodeURIComponent(query)}&include_adult=false&language=pt-BR`);
+        if (data && data.results && data.results.length > 0) {
+            const bestMatch = data.results.find(i => i.media_type === 'movie' || i.media_type === 'tv');
+            if (bestMatch) this.createCardHtml(bestMatch);
+        }
+    },
+
+    createCardHtml(item) {
+        const div = document.createElement('div');
+        div.className = 'message bot';
+        const poster = item.poster_path ? `${IMG_BASE}${item.poster_path}` : 'images/favicon.png';
+        const title = item.title || item.name;
+        const year = (item.release_date || item.first_air_date || '????').substring(0, 4);
+        const type = item.media_type || 'movie';
+
+        div.innerHTML = `
+            <div class="bryia-card">
+                <img src="${poster}" onerror="this.src='images/favicon.png'">
+                <div class="bryia-card-info">
+                    <h4>${title} <small>(${year})</small></h4>
+                    <a href="detalhes.html?id=${item.id}&type=${type}" class="btn-play-mini"><i class="fas fa-play"></i> Ver</a>
+                </div>
+            </div>`;
+        this.elements.msgs.appendChild(div);
+        this.elements.msgs.scrollTop = this.elements.msgs.scrollHeight;
+    },
+
+    appendMsg(text, sender, isLoading = false) {
+        const div = document.createElement('div');
+        div.className = `message ${sender}`;
+
+        // CORREÇÃO: Agora damos um nome (ID) para a bolinha, assim podemos achá-la para apagar depois
+        if (isLoading) div.id = 'loading-msg';
+
+        div.innerHTML = isLoading
+            ? `<div class="msg-text"><i class="fas fa-circle-notch fa-spin"></i></div>`
+            : `<div class="msg-text">${text}</div>`;
+
+        this.elements.msgs.appendChild(div);
+        this.elements.msgs.scrollTop = this.elements.msgs.scrollHeight;
+
+        // Retorna o nome para a função sendMessage usar
+        return isLoading ? 'loading-msg' : null;
+    }
+};
+
+// =================================================================
+//  FUNÇÃO SURPREENDA-ME (Botão da Esquerda)
+// =================================================================
+async function surpreendaMe() {
+    try {
+        // Pega uma página aleatória (1 a 50)
+        const randomPage = Math.floor(Math.random() * 50) + 1;
+        const data = await fetchTMDB(`/movie/popular?page=${randomPage}`);
+
+        if (data && data.results && data.results.length > 0) {
+            const randomMovie = data.results[Math.floor(Math.random() * data.results.length)];
+            if (randomMovie && randomMovie.id) {
+                // Redireciona
+                window.location.href = `detalhes.html?id=${randomMovie.id}&type=movie`;
+            }
+        } else {
+            showToast("Tente novamente...", "error");
+        }
+    } catch (e) {
+        console.error("Erro Shuffle:", e);
+    }
+}
+
+// =================================================================
+//  INICIALIZADOR MESTRE (LIGA TUDO NO FINAL)
+// =================================================================
+document.addEventListener('DOMContentLoaded', () => {
+    console.log("WinBry+ Mestre Iniciado 🚀");
+
+    // 1. Inicializações Visuais
+    if (typeof initTheme === 'function') initTheme();
+    if (typeof initMenuMobile === 'function') initMenuMobile();
+    if (typeof initSearch === 'function') initSearch();
+    if (typeof initVideoModal === 'function') initVideoModal();
+    if (typeof initHeaderUser === 'function') initHeaderUser();
+    if (typeof initTransitionManager === 'function') initTransitionManager();
+    if (typeof initSaveButton === 'function') initSaveButton();
+    if (typeof loadContinueWatching === 'function') loadContinueWatching();
+
+    // 2. Formulários
+    const cadastroForm = document.getElementById("cadastroForm");
+    if (cadastroForm && typeof initCadastro === 'function') initCadastro(cadastroForm);
+
+    const loginForm = document.getElementById("loginForm");
+    if (loginForm && typeof initLogin === 'function') initLogin(loginForm);
+
+    if (document.querySelector('.account-info-card') && typeof initMinhaConta === 'function') {
+        initMinhaConta();
+    }
+
+    // 3. Inicializa IA e Sistema
+    try {
+        if (typeof System !== 'undefined') System.initSettings();
+        if (typeof BryIA !== 'undefined') BryIA.init();
+    } catch (e) { console.error("Erro IA:", e); }
+
+    // 4. Header Fade In
+    const userActions = document.querySelector('.user-actions');
+    if (userActions) {
+        setTimeout(() => {
+            userActions.style.opacity = '1';
+            userActions.style.visibility = 'visible';
+        }, 100);
+    }
+
+    // 5. Roteamento Inteligente
+    const path = window.location.pathname;
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('id');
+    const type = params.get('type');
+    const search = params.get('search');
+    const isHub = params.get('global') === 'true';
+
+    // Seletor de Página
+    if (path.includes('detalhes') && id && type) {
+        if (typeof loadDetails === 'function') loadDetails(type, id);
+    }
+    else if (path.includes('filmes')) {
+        currentType = 'movie';
+        if (search && typeof handleSearchRouting === 'function') handleSearchRouting(search, 'movie', isHub);
+        else if (typeof loadCatalog === 'function') loadCatalog('movie', 1);
+    }
+    else if (path.includes('series')) {
+        currentType = 'tv';
+        if (search && typeof loadSearch === 'function') loadSearch(search, 'tv', 1);
+        else if (typeof loadCatalog === 'function') loadCatalog('tv', 1);
+    }
+    else if (path.includes('animes')) {
+        currentType = 'anime';
+        if (search && typeof loadSearch === 'function') loadSearch(search, 'tv', 1);
+        else if (typeof loadAnimes === 'function') loadAnimes(1);
+    }
+    else if (path.includes('minha-lista')) {
+        if (typeof initMinhaListaPage === 'function') initMinhaListaPage();
+    }
+    else if (path.includes('index') || path === '/' || path.endsWith('/')) {
+        if (typeof loadHome === 'function') loadHome();
+    }
+});
+
+// --- FUNÇÃO ESQUECI MINHA SENHA (CORRIGIDA E MELHORADA) ---
+function initEsqueciSenha() {
+    const btn = document.getElementById('btn-esqueci-senha');
+    if (!btn) return;
+
+    btn.onclick = async (e) => {
+        e.preventDefault(); // Impede a página de pular ou recarregar
+
+        // 1. Tenta pegar o e-mail do campo de login
+        let email = document.getElementById('email').value.trim();
+
+        // 2. Se o campo estiver vazio, PERGUNTA ao usuário via Prompt
+        if (!email) {
+            email = prompt("Por favor, digite seu e-mail para recuperar a senha:");
+        }
+
+        // 3. Se ainda assim estiver vazio (usuário cancelou), para tudo
+        if (!email) return;
+
+        // 4. Manda o Firebase enviar o e-mail
+        try {
+            showToast("Enviando e-mail de recuperação...", "info");
+            await auth.sendPasswordResetEmail(email);
+            showToast(`E-mail enviado para: ${email}. Verifique sua caixa de entrada e spam!`, "success");
+        } catch (error) {
+            console.error(error);
+            const msg = (typeof getFirebaseErrorMessage === 'function')
+                ? getFirebaseErrorMessage(error)
+                : "Erro ao enviar e-mail. Verifique se o endereço está correto.";
+            showToast(msg, "error");
+        }
+    };
+}
+
+// --- TRADUTOR DE ERROS COMPLETO (PORTUGUÊS) ---
+function getFirebaseErrorMessage(error) {
+    const code = error.code || "";
+
+    switch (code) {
+        // --- PROBLEMAS COM E-MAIL E SENHA ---
+        case 'auth/email-already-in-use':
+            return "Este e-mail já está sendo usado por outra pessoa. Tente fazer login.";
+
+        case 'auth/invalid-email':
+            return "O e-mail digitado não é válido. Verifique se digitou corretamente.";
+
+        case 'auth/weak-password':
+            return "Sua senha é muito fraca. Ela precisa ter pelo menos 6 caracteres.";
+
+        case 'auth/wrong-password':
+            return "Senha incorreta. Tente novamente ou redefina sua senha.";
+
+        case 'auth/user-not-found':
+            return "Não encontramos nenhuma conta com esse e-mail.";
+
+        case 'auth/invalid-credential':
+            return "E-mail ou senha incorretos. Verifique seus dados.";
+
+        // --- SEGURANÇA E BLOQUEIOS ---
+        case 'auth/user-disabled':
+            return "Esta conta foi desativada por segurança. Entre em contato com o suporte.";
+
+        case 'auth/too-many-requests':
+            return "Muitas tentativas falhas seguidas! O acesso foi bloqueado temporariamente. Espere alguns minutos.";
+
+        case 'auth/requires-recent-login':
+            return "Por segurança, faça logout e login novamente antes de excluir sua conta.";
+
+        // --- RECUPERAÇÃO DE SENHA ---
+        case 'auth/missing-email':
+            return "Por favor, digite o e-mail no campo acima para recuperar a senha.";
+
+        // --- ERROS TÉCNICOS ---
+        case 'auth/network-request-failed':
+            return "Sem conexão com a internet. Verifique seu Wi-Fi/Dados.";
+
+        case 'auth/operation-not-allowed':
+            return "Erro no sistema (Login não habilitado no Firebase). Avise o administrador.";
+
+        case 'auth/popup-closed-by-user':
+            return "O login foi cancelado.";
+
+        // --- ERRO DESCONHECIDO ---
+        default:
+            return "Ocorreu um erro inesperado: " + error.message;
+    }
+}
+
+if (document.getElementById("btn-google-login")) {
+    initGoogleLogin();
+}
+
+// =================================================================
+// LOADER DE TRANSIÇÃO (FLUIDO E SÓLIDO)
+// =================================================================
+
+function initGlobalLoader() {
+    // 1. Injeta o HTML na página se não existir
+    if (!document.getElementById('global-loader')) {
+        const loaderHTML = `
+            <div id="global-loader">
+                <div class="spinner-ring"></div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('afterbegin', loaderHTML);
+    }
+
+    const loader = document.getElementById('global-loader');
+
+    // Funções de Controle
+    const showLoader = () => loader && loader.classList.add('visible');
+    const hideLoader = () => loader && loader.classList.remove('visible');
+
+    // --- EVENTOS ---
+
+    // 1. Ao carregar a página: Esconde o loader (Fade Out)
+    // Pequeno delay para garantir que o layout carregou
+    window.addEventListener('load', () => setTimeout(hideLoader, 300));
+
+    // 2. Correção para botão "Voltar" (Safari/Mobile)
+    window.addEventListener('pageshow', hideLoader);
+
+    // 3. Interceptar Cliques
+    document.addEventListener('click', (e) => {
+        const link = e.target.closest('a');
+
+        // Só ativa se for link interno real
+        if (link && link.href &&
+            link.href.includes(window.location.hostname) &&
+            !link.target &&
+            !link.href.includes('#') &&
+            !link.getAttribute('download') &&
+            !link.href.includes('javascript')) {
+
+            e.preventDefault(); // Para a navegação padrão
+
+            showLoader(); // Tela fica preta instantaneamente
+
+            // Espera o tempo "cinematográfico" antes de trocar
+            setTimeout(() => {
+                window.location.href = link.href;
+            }, 1000);
+        }
+    });
+}

@@ -9,6 +9,13 @@
   <link rel="icon" href="images/favicon.png" />
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+  <link rel="manifest" href="/manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#e50914">
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 </head>
 
 <body class="dark-mode">
@@ -50,12 +57,19 @@
       <div class="data-column">
         <div class="data-group">
           <strong>Nome de Usuário</strong>
-          <span id="display-username">Carregando...</span>
+          <div class="data-value-row">
+            <span id="display-username">Carregando...</span>
+            <button id="btn-edit-profile" class="btn-icon-edit" title="Editar Dados">
+              <i class="fas fa-pen"></i>
+            </button>
+          </div>
         </div>
 
         <div class="data-group">
           <strong>E-mail de Acesso</strong>
-          <span id="display-email">Carregando...</span>
+          <div class="data-value-row">
+            <span id="display-email">Carregando...</span>
+          </div>
         </div>
 
         <div class="data-group">
@@ -63,10 +77,42 @@
           <span class="plan-badge">Básico</span>
         </div>
 
+        <div class="data-group">
+          <strong>Chave da API (Gemini AI)</strong>
+          <div style="display:flex; gap:10px; width:100%; align-items: center;">
+            <input type="password" id="user-api-key" placeholder="Cole sua API Key aqui"
+              style="background:transparent; border:none; border-bottom:1px solid #333; color:white; flex:1; padding:8px;">
+            <button id="btn-save-key" class="btn btn-primary"
+              style="padding: 5px 15px; font-size: 0.8rem; height: 30px;">Salvar</button>
+          </div>
+          <small style="color:#666; font-size:0.75rem; margin-top:5px;">Necessário para usar a BryIA.</small>
+        </div>
+
         <div class="action-buttons">
           <button class="btn-logout">Sair da Conta</button>
         </div>
       </div>
+    </div>
+  </div>
+  <div id="edit-profile-modal" class="modal-overlay">
+    <div class="modal-box">
+      <h3>Editar Perfil</h3>
+      <form id="editProfileForm">
+
+        <div class="form-group">
+          <label>Nome de Exibição</label>
+          <input type="text" id="edit-name" required placeholder="Como você quer ser chamado?">
+        </div>
+
+        <p style="font-size: 0.8rem; color: #888; margin-bottom: 20px;">
+          O e-mail e a foto são gerenciados pela sua conta Google.
+        </p>
+
+        <div class="modal-actions">
+          <button type="button" id="btn-cancel-edit" class="btn-ghost">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar</button>
+        </div>
+      </form>
     </div>
   </div>
 

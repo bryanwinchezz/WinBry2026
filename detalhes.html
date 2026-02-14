@@ -9,6 +9,13 @@
     <link rel="icon" href="images/favicon.png" />
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#e50914">
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 </head>
 <script src="https://pl28671922.effectivegatecpm.com/5f/88/aa/5f88aae4fb1e2e5eae5996a2e6e8055f.js"></script>
 <script src="https://ballisticcomainvitation.com/79/85/71/79857171a396183aaa7a02ecdb6092c0.js"></script>
@@ -100,6 +107,54 @@
             </div>
         </div>
     </footer>
+
+    <div id="bryia-fab" class="bryia-fab">
+        <i class="fa-brands fa-bilibili"></i>
+    </div>
+
+    <div id="bryia-window" class="bryia-window">
+        <div class="bryia-header">
+            <div class="bryia-title">
+                <i class="fa-brands fa-bilibili"></i> BryIA <span>Assistente</span>
+            </div>
+            <button id="close-bryia"><i class="fas fa-times"></i></button>
+        </div>
+
+        <div class="bryia-messages" id="bryia-messages">
+            <div class="message bot">
+                <div class="msg-text">Olá! Eu sou a BryIA. Posso te indicar filmes, séries ou animes. O que você quer
+                    assistir hoje? 🍿📽</div>
+            </div>
+        </div>
+
+        <div class="bryia-input-area">
+            <input type="text" id="bryia-input" placeholder="Ex: Filme de terror no espaço...">
+            <button id="bryia-send"><i class="fas fa-paper-plane"></i></button>
+        </div>
+    </div>
+
+    <nav class="bottom-nav">
+        <a href="index.html" class="nav-item">
+            <i class="fas fa-home"></i>
+            <span>Início</span>
+        </a>
+        <a href="filmes.html" class="nav-item">
+            <i class="fas fa-film"></i>
+            <span>Filmes</span>
+        </a>
+        <a href="series.html" class="nav-item">
+            <i class="fas fa-tv"></i>
+            <span>Séries</span>
+        </a>
+        <a href="animes.html" class="nav-item">
+            <i class="fas fa-dragon"></i>
+            <span>Animes</span>
+        </a>
+        <a href="formulario.html" class="nav-item">
+            <i class="fas fa-comments"></i>
+            <span>Pedir</span>
+        </a>
+    </nav>
 
     <script src="/app.js"></script>
 </body>

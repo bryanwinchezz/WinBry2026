@@ -1231,9 +1231,14 @@ input[type="file"] {
     padding: 16px 24px;
     border-radius: 4px;
     color: white;
-    z-index: 3000;
+
+    z-index: 10001 !important;
+    /* <--- A MUDANÇA: Acima do Modal (9999) */
+
     transform: translateX(200%);
     transition: transform 0.3s ease;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+    /* Sombra para destacar */
 }
 
 .toast.show {
@@ -1942,9 +1947,9 @@ footer {
         border-radius: 4px !important;
     }
 
-    /* Esconde ícones menos usados no mobile se quiser limpar mais */
-    #theme-toggle,
-    a[href="formulario.html"] {
+    /* CORREÇÃO: Esconde ícones APENAS do Topo (user-actions), mas deixa aparecer embaixo */
+    .user-actions #theme-toggle,
+    .user-actions a[href="formulario.html"] {
         display: none !important;
     }
 }
@@ -2528,19 +2533,21 @@ footer {
 .hero-indicators {
     position: absolute;
     bottom: 20px;
-    
+
     /* COMANDOS PARA CENTRALIZAR: */
     left: 50%;
     transform: translateX(-50%);
-    
+
     display: flex;
-    gap: 8px; /* Espaço entre as barrinhas */
+    gap: 8px;
+    /* Espaço entre as barrinhas */
     z-index: 20;
 }
 
 /* Opcional: Se quiser as barras um pouco maiores para destacar mais */
 .indicator-bar {
-    width: 50px; /* Eram 40px, aumentei para 50px */
+    width: 50px;
+    /* Eram 40px, aumentei para 50px */
     height: 4px;
     background-color: rgba(255, 255, 255, 0.3);
     border-radius: 2px;
@@ -2592,5 +2599,746 @@ footer {
     .indicator-bar {
         width: 30px;
         /* Barras um pouco menores no celular */
+    }
+}
+
+/* --- BRY.IA (CHATBOT) --- */
+.bryia-fab {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.8rem;
+    background: linear-gradient(135deg, #e50914, #ff6b6b);
+    box-shadow: 0 5px 15px rgba(229, 9, 20, 0.5);
+    cursor: pointer;
+    z-index: 5000;
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.bryia-fab:hover {
+    transform: scale(1.1) rotate(10deg);
+}
+
+.bryia-window {
+    position: fixed;
+    bottom: 100px;
+    right: 30px;
+    width: 380px;
+    height: 550px;
+    background: #1a1a1a;
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 5000;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(20px);
+    transition: all 0.3s ease;
+    border: 1px solid #333;
+}
+
+.bryia-window.active {
+    opacity: 1;
+    pointer-events: all;
+    transform: translateY(0);
+}
+
+.bryia-header {
+    background: var(--color-primary);
+    padding: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: white;
+}
+
+.bryia-title {
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.bryia-title span {
+    font-weight: 400;
+    font-size: 0.8rem;
+    opacity: 0.8;
+    background: rgba(0, 0, 0, 0.2);
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+#close-bryia {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    font-size: 1.2rem;
+}
+
+.bryia-messages {
+    flex: 1;
+    padding: 15px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    background: #141414;
+}
+
+/* Balões de mensagem */
+.message {
+    max-width: 85%;
+    line-height: 1.4;
+    font-size: 0.95rem;
+}
+
+.message.user {
+    align-self: flex-end;
+}
+
+.message.bot {
+    align-self: flex-start;
+}
+
+.message.user .msg-text {
+    background: var(--color-primary);
+    color: white;
+    padding: 10px 15px;
+    border-radius: 15px 15px 2px 15px;
+}
+
+.message.bot .msg-text {
+    background: #2a2a2a;
+    color: #ddd;
+    padding: 10px 15px;
+    border-radius: 15px 15px 15px 2px;
+    border: 1px solid #333;
+}
+
+.bryia-input-area {
+    padding: 15px;
+    background: #1a1a1a;
+    display: flex;
+    gap: 10px;
+    border-top: 1px solid #333;
+}
+
+#bryia-input {
+    flex: 1;
+    background: #111;
+    border: 1px solid #333;
+    padding: 10px;
+    border-radius: 20px;
+    color: white;
+    outline: none;
+}
+
+#bryia-send {
+    background: var(--color-primary);
+    border: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* CARD RICO (RECOMENDAÇÃO) */
+.bryia-card {
+    /* display: flex; */
+    gap: 10px;
+    background: #222;
+    padding: 10px;
+    border-radius: 8px;
+    margin-top: 8px;
+    border: 1px solid #333;
+    display: none;
+}
+
+.bryia-card img {
+    width: 60px;
+    height: 90px;
+    object-fit: cover;
+    border-radius: 4px;
+}
+
+.bryia-card-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.bryia-card h4 {
+    font-size: 0.9rem;
+    color: white;
+    margin: 0 0 5px 0;
+}
+
+.bryia-card .btn-play-mini {
+    background: var(--color-primary);
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    width: fit-content;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+    .bryia-window {
+        width: 90%;
+        height: 70vh;
+        bottom: 100px;
+        right: 5%;
+    }
+}
+
+/* --- MENU INFERIOR MOBILE --- */
+.bottom-nav {
+    display: none;
+    /* Escondido no PC */
+}
+
+@media (max-width: 768px) {
+
+    /* Esconde o menu antigo e icones do topo no mobile */
+    .menu-toggle,
+    .main-nav {
+        display: none !important;
+    }
+
+    /* Mostra o novo */
+    .bottom-nav {
+        display: flex;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        background-color: rgba(20, 20, 20, 0.95);
+        backdrop-filter: blur(10px);
+        border-top: 1px solid #333;
+        justify-content: space-around;
+        padding: 10px 0;
+        z-index: 4000;
+        /* Abaixo do chat da IA */
+        padding-bottom: env(safe-area-inset-bottom);
+        /* Ajuste iPhone */
+    }
+
+    .nav-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        color: #808080;
+        text-decoration: none;
+        font-size: 0.7rem;
+        gap: 4px;
+    }
+
+    .nav-item i {
+        font-size: 1.4rem;
+        margin-bottom: 2px;
+    }
+
+    .nav-item.active,
+    .nav-item:hover {
+        color: white;
+    }
+
+    /* --- AJUSTE BOTÃO IA NO MOBILE (Igual ao Surpreenda-me) --- */
+    .bryia-fab {
+        bottom: 85px !important;
+        /* Mesma altura do outro */
+        right: 20px !important;
+        /* Mesma distância da borda */
+        width: 50px !important;
+        /* Mesmo tamanho */
+        height: 50px !important;
+        /* Mesmo tamanho */
+        font-size: 1.2rem !important;
+        /* Ícone ajustado */
+        border-radius: 50%;
+
+        /* BÔNUS: Gradiente moderno para parecer IA avançada */
+        background: linear-gradient(135deg, #e50914, #ff6b6b);
+        box-shadow: 0 5px 15px rgba(229, 9, 20, 0.5);
+    }
+
+    .bryia-window {
+        bottom: 150px;
+    }
+}
+
+/* --- SKELETON LOADING --- */
+.skeleton {
+    background: linear-gradient(90deg, #1f1f1f 25%, #2a2a2a 50%, #1f1f1f 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 4px;
+}
+
+@keyframes shimmer {
+    0% {
+        background-position: 200% 0;
+    }
+
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+/* Aplica nas imagens enquanto carregam */
+img.loading {
+    opacity: 0;
+}
+
+/* --- BOTÃO SURPREENDA-ME (FLUTUANTE ESQUERDA) --- */
+.surpreenda-fab {
+    display: none;
+    position: fixed;
+    bottom: 30px;
+    left: 30px;
+    background: #ffffff;
+    color: #000000;
+    padding: 12px 24px;
+    border-radius: 50px;
+    align-items: center;
+    gap: 10px;
+    font-weight: 800;
+    font-size: 0.95rem;
+    cursor: pointer;
+    box-shadow: 0 5px 20px rgba(255, 255, 255, 0.15);
+    z-index: 5000;
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s;
+    border: 2px solid transparent;
+}
+
+.surpreenda-fab i {
+    font-size: 1.1rem;
+    color: var(--color-primary);
+    /* Ícone vermelho */
+}
+
+.surpreenda-fab:hover {
+    transform: scale(1.05) translateY(-3px);
+    box-shadow: 0 10px 25px rgba(255, 255, 255, 0.3);
+}
+
+.surpreenda-fab:active {
+    transform: scale(0.95);
+}
+
+/* Ajuste Mobile: Sobe um pouco por causa do menu inferior */
+@media (max-width: 768px) {
+    .surpreenda-fab {
+        bottom: 85px;
+        /* Alinhado com o botão da IA */
+        left: 20px;
+        padding: 10px 16px;
+        font-size: 0.8rem;
+    }
+
+    .surpreenda-fab span {
+        display: none;
+        /* No celular mostra só o ícone para economizar espaço */
+    }
+
+    .surpreenda-fab {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        justify-content: center;
+        padding: 0;
+    }
+}
+
+/* --- ESTILO MINHA CONTA (CORRIGIDO VERTICAL) --- */
+
+.data-column {
+    display: flex;
+    flex-direction: column;
+    /* FORÇA UM EMBAIXO DO OUTRO */
+    gap: 30px;
+    /* Espaço entre os grupos */
+    width: 100%;
+}
+
+.data-group {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    width: 100%;
+    position: relative;
+}
+
+.data-group strong {
+    color: #666;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+}
+
+/* =================================================================
+   ESTILO MINHA CONTA - CAIXAS MODERNAS
+   ================================================================= */
+
+/* Transforma a linha do dado em uma "caixa" */
+.data-value-row {
+    border: 1px solid #444 !important;
+    /* Borda cinza em volta de tudo */
+    border-radius: 8px;
+    /* Cantos arredondados */
+    padding: 12px 15px;
+    /* Espaço interno generoso */
+    background: rgba(255, 255, 255, 0.03);
+    /* Fundo muito sutil */
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 8px;
+    /* Separa do título acima */
+    transition: border-color 0.3s;
+}
+
+/* Efeito ao passar o mouse na caixa */
+.data-value-row:hover {
+    border-color: var(--color-primary);
+    /* Borda fica vermelha */
+}
+
+/* Ajusta o texto dentro da caixa */
+.data-group span {
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: #eee;
+}
+
+/* Ajusta o botão de lápis dentro da caixa */
+.btn-icon-edit {
+    padding: 8px;
+    margin-left: 10px;
+    background: rgba(255, 255, 255, 0.1);
+    /* Fundo sutil no botão */
+    border-radius: 50%;
+    /* Botão redondo */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+}
+
+.btn-icon-edit:hover {
+    background: var(--color-primary);
+    color: white;
+    transform: none;
+    /* Remove o zoom anterior para ficar mais sóbrio */
+}
+
+/* --- APLICAR O MESMO ESTILO AO INPUT DA API KEY PARA COMBINAR --- */
+#user-api-key {
+    border: 1px solid #444 !important;
+    border-radius: 8px !important;
+    padding: 12px 15px !important;
+    background: rgba(255, 255, 255, 0.03) !important;
+    margin-top: 8px;
+    flex: 1;
+    /* Ocupa o espaço disponível */
+    color: white !important;
+}
+
+#user-api-key:focus {
+    border-color: var(--color-primary) !important;
+    outline: none;
+}
+
+/* Ajusta o botão Salvar da API Key para ficar na mesma altura */
+#btn-save-key {
+    height: auto !important;
+    padding: 0 20px !important;
+    border-radius: 8px;
+    margin-top: 8px;
+    align-self: stretch;
+    /* Estica na altura do input */
+    display: flex;
+    align-items: center;
+}
+
+/* --- MODAL (POP-UP) --- */
+.modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    z-index: 9999;
+    /* Fica acima de tudo */
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(5px);
+}
+
+.modal-overlay.active {
+    display: flex;
+    /* Aparece quando tem a classe active */
+}
+
+.modal-box {
+    background: #141414;
+    padding: 30px;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 400px;
+    border: 1px solid #333;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.9);
+    animation: popIn 0.3s ease;
+}
+
+.modal-box h3 {
+    margin-bottom: 20px;
+    color: white;
+    border-bottom: 1px solid var(--color-primary);
+    padding-bottom: 10px;
+    display: inline-block;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 15px;
+    margin-top: 25px;
+}
+
+.btn-ghost {
+    background: transparent;
+    border: 1px solid #444;
+    color: #ccc;
+    padding: 8px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.btn-ghost:hover {
+    border-color: #fff;
+    color: #fff;
+}
+
+/* --- ESTILO ESPECÍFICO DA PÁGINA DE LOGIN --- */
+.login-page {
+    overflow: hidden;
+    /* Impede rolagem */
+    position: relative;
+    height: 100vh;
+    width: 100vw;
+}
+
+/* 1. Fundo com Pôsteres (Imagem de fundo estilo Netflix) */
+.login-bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    /* Imagem genérica de colagem de filmes */
+    background-image: url('https://assets.nflxext.com/ffe/siteui/vlv3/c38a2d52-138e-48a3-ab68-36787ece46b3/eeb03fc9-99bf-440f-9695-1647a5078712/BR-pt-20240101-popsignuptwoweeks-perspective_alpha_website_large.jpg');
+    background-size: cover;
+    background-position: center;
+    z-index: 1;
+    animation: zoomBackground 20s infinite alternate;
+    /* Movimento suave */
+}
+
+@keyframes zoomBackground {
+    from {
+        transform: scale(1);
+    }
+
+    to {
+        transform: scale(1.1);
+    }
+}
+
+/* 2. Sobreposição Escura (Para dar leitura) */
+.login-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0.9) 100%);
+    z-index: 2;
+}
+
+/* 3. A Caixa de Login (Glassmorphism) */
+.auth-wrapper {
+    position: relative;
+    z-index: 3;
+    /* Fica acima do fundo */
+}
+
+.glass-effect {
+    background: rgba(0, 0, 0, 0.75);
+    /* Fundo preto transparente */
+    backdrop-filter: blur(10px);
+    /* O desfoque mágico */
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
+    border-radius: 16px;
+    padding: 60px 40px;
+    max-width: 450px;
+    width: 90%;
+    text-align: center;
+}
+
+/* 4. Tipografia e Logo */
+.logo-text {
+    font-family: 'Arial Black', sans-serif;
+    font-size: 3rem;
+    color: var(--color-primary);
+    text-shadow: 0 0 20px rgba(229, 9, 20, 0.6);
+    display: block;
+    margin-bottom: 10px;
+    letter-spacing: -2px;
+}
+
+.login-subtitle {
+    color: #ccc;
+    font-size: 1rem;
+    margin-bottom: 40px;
+    line-height: 1.5;
+}
+
+/* 5. Botão Google Premium */
+.btn-google-premium {
+    width: 100%;
+    height: 55px;
+    background-color: white;
+    border: none;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    padding: 3px;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    font-family: inherit;
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-google-premium:hover {
+    transform: scale(1.02);
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+}
+
+.google-icon-wrapper {
+    width: 48px;
+    height: 48px;
+    background-color: white;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.google-icon-wrapper img {
+    width: 24px;
+    height: 24px;
+}
+
+.btn-google-premium span {
+    flex: 1;
+    text-align: center;
+    font-weight: 700;
+    color: #444;
+    font-size: 1.1rem;
+    padding-right: 20px;
+    /* Compensa o ícone na esquerda */
+}
+
+.login-footer {
+    margin-top: 30px;
+    font-size: 0.75rem;
+    color: #666;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding-top: 20px;
+}
+
+/* =================================================================
+   LOADER GLOBAL (POR CIMA DE TUDO)
+   ================================================================= */
+
+#global-loader {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: #141414;
+    /* Mesma cor do fundo do site */
+    z-index: 2147483647;
+    /* Valor máximo possível no navegador */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    /* Estado Padrão: Invisível e Intocável */
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+
+    transition: opacity 0.4s ease;
+    /* Fade suave ao sumir/aparecer */
+}
+
+/* Quando ativado pelo JS */
+#global-loader.visible {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: all;
+    /* Bloqueia cliques na tela */
+}
+
+/* Animação do Anel (Semelhante a Netflix/YouTube) */
+.spinner-ring {
+    width: 60px;
+    height: 60px;
+    border: 4px solid rgba(255, 255, 255, 0.1);
+    border-top-color: var(--color-primary);
+    /* Vermelho */
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    box-shadow: 0 0 20px rgba(229, 9, 20, 0.2);
+    /* Brilho leve */
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
     }
 }

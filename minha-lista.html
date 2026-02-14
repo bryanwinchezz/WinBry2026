@@ -9,6 +9,13 @@
     <link rel="icon" href="images/favicon.png" />
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#e50914">
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 </head>
 
 <body class="dark-mode">
@@ -64,6 +71,29 @@
             </div>
         </div>
     </footer>
+
+    <nav class="bottom-nav">
+        <a href="index.html" class="nav-item">
+            <i class="fas fa-home"></i>
+            <span>Início</span>
+        </a>
+        <a href="filmes.html" class="nav-item">
+            <i class="fas fa-film"></i>
+            <span>Filmes</span>
+        </a>
+        <a href="series.html" class="nav-item">
+            <i class="fas fa-tv"></i>
+            <span>Séries</span>
+        </a>
+        <a href="animes.html" class="nav-item">
+            <i class="fas fa-dragon"></i>
+            <span>Animes</span>
+        </a>
+        <a href="formulario.html" class="nav-item">
+            <i class="fas fa-comments"></i>
+            <span>Pedir</span>
+        </a>
+    </nav>
 
     <script src="/app.js"></script>
 </body>
