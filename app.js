@@ -913,17 +913,40 @@ function setupHeroBanner(item) {
 function renderCarousel(sectionId, title, items, type) {
     const section = document.getElementById(sectionId);
     if (!section) return;
+
     const container = section.querySelector('.container');
+
+    // 1. Limpa e coloca o título
     container.innerHTML = `<h2>${title}</h2>`;
+
     const wrapper = document.createElement('div');
     wrapper.className = 'carousel-wrapper';
+
     const carousel = document.createElement('div');
     carousel.className = 'carousel';
-    items.forEach(item => carousel.innerHTML += createCardHTML(item, type));
 
-    const prev = document.createElement('button'); prev.className = 'carousel-btn prev'; prev.innerHTML = '<i class="fas fa-chevron-left"></i>';
+    // --- A CORREÇÃO MÁGICA AQUI ---
+    // Criamos uma variável na memória para guardar todo o HTML
+    let htmlAcumulado = '';
+
+    items.forEach(item => {
+        // Soma o HTML na variável (super rápido)
+        htmlAcumulado += createCardHTML(item, type);
+    });
+
+    // Joga na tela UMA VEZ SÓ (a TV agradece!)
+    carousel.innerHTML = htmlAcumulado;
+    // -----------------------------
+
+    // Botões de Navegação
+    const prev = document.createElement('button');
+    prev.className = 'carousel-btn prev';
+    prev.innerHTML = '<i class="fas fa-chevron-left"></i>';
     prev.onclick = () => carousel.scrollBy({ left: -300, behavior: 'smooth' });
-    const next = document.createElement('button'); next.className = 'carousel-btn next'; next.innerHTML = '<i class="fas fa-chevron-right"></i>';
+
+    const next = document.createElement('button');
+    next.className = 'carousel-btn next';
+    next.innerHTML = '<i class="fas fa-chevron-right"></i>';
     next.onclick = () => carousel.scrollBy({ left: 300, behavior: 'smooth' });
 
     wrapper.append(prev, carousel, next);
@@ -1639,7 +1662,12 @@ const BryIA = {
 
         const key = System.getKey();
         if (!key) {
-            this.appendMsg("⚠️ Configure sua API Key em 'Minha Conta'.", 'bot');
+            this.appendMsg(
+                "⚠️ <b>Preciso da sua API Key!</b><br><br>" +
+                "1. Pegue sua chave grátis no <a href='https://aistudio.google.com/app/apikey' target='_blank' style='color: #ff4444; text-decoration: underline;'>Google AI Studio</a>.<br>" +
+                "2. Depois, vá em <b>Minha Conta</b> aqui no site e cole a chave lá.",
+                'bot'
+            );
             return;
         }
 
