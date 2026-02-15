@@ -913,40 +913,17 @@ function setupHeroBanner(item) {
 function renderCarousel(sectionId, title, items, type) {
     const section = document.getElementById(sectionId);
     if (!section) return;
-
     const container = section.querySelector('.container');
-
-    // 1. Limpa e coloca o título
     container.innerHTML = `<h2>${title}</h2>`;
-
     const wrapper = document.createElement('div');
     wrapper.className = 'carousel-wrapper';
-
     const carousel = document.createElement('div');
     carousel.className = 'carousel';
+    items.forEach(item => carousel.innerHTML += createCardHTML(item, type));
 
-    // --- A CORREÇÃO MÁGICA AQUI ---
-    // Criamos uma variável na memória para guardar todo o HTML
-    let htmlAcumulado = '';
-
-    items.forEach(item => {
-        // Soma o HTML na variável (super rápido)
-        htmlAcumulado += createCardHTML(item, type);
-    });
-
-    // Joga na tela UMA VEZ SÓ (a TV agradece!)
-    carousel.innerHTML = htmlAcumulado;
-    // -----------------------------
-
-    // Botões de Navegação
-    const prev = document.createElement('button');
-    prev.className = 'carousel-btn prev';
-    prev.innerHTML = '<i class="fas fa-chevron-left"></i>';
+    const prev = document.createElement('button'); prev.className = 'carousel-btn prev'; prev.innerHTML = '<i class="fas fa-chevron-left"></i>';
     prev.onclick = () => carousel.scrollBy({ left: -300, behavior: 'smooth' });
-
-    const next = document.createElement('button');
-    next.className = 'carousel-btn next';
-    next.innerHTML = '<i class="fas fa-chevron-right"></i>';
+    const next = document.createElement('button'); next.className = 'carousel-btn next'; next.innerHTML = '<i class="fas fa-chevron-right"></i>';
     next.onclick = () => carousel.scrollBy({ left: 300, behavior: 'smooth' });
 
     wrapper.append(prev, carousel, next);
@@ -1693,7 +1670,7 @@ const BryIA = {
     },
 
     async callGemini(prompt, key) {
-        const modelName = "gemini-2.5-flash";
+        const modelName = "gemini-2.5-flash"; // ou gemini-1.5-flash se preferir
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`;
 
         // --- CONTEXTO INTELIGENTE (LÊ A TELA) ---
@@ -1703,26 +1680,32 @@ const BryIA = {
         const tituloNaTela = document.querySelector('.info-text h1');
         if (tituloNaTela) {
             const titulo = tituloNaTela.innerText;
-            const nota = document.querySelector('.star-rating')?.innerText || "N/A";
-            const sinopse = document.querySelector('#synopsis-content')?.innerText || "";
+            const elNota = document.querySelector('.star-rating');
+            const nota = elNota ? elNota.innerText : "N/A";
+            const elSinopse = document.querySelector('#synopsis-content');
+            const sinopse = elSinopse ? elSinopse.innerText : "";
 
             contextoPagina = `
-            CONTEXTO ATUAL: O usuário está na página de detalhes assistindo: "${titulo}".
-            Nota do filme: ${nota}.
-            Sinopse na tela: "${sinopse.substring(0, 100)}...".
-            Se o usuário perguntar "é bom?", "quanto dura?" ou "tem continuação?", refira-se a ESTE título.
+            CONTEXTO: O usuário está na página do filme: "${titulo}". Nota: ${nota}.
             `;
         } else if (window.location.pathname.includes('minha-lista')) {
-            contextoPagina = "CONTEXTO ATUAL: O usuário está olhando a 'Minha Lista'.";
+            contextoPagina = "CONTEXTO: O usuário está na 'Minha Lista'.";
         }
 
+        // --- A CORREÇÃO PRINCIPAL ESTÁ AQUI (INSTRUÇÃO MAIS FORTE) ---
         const systemInstruction = `
-        Você é a BryIA, a assistente cinéfila do WinBry+.
-        Use emojis 🍿🎬. Respostas curtas e diretas.
+        Você é a BryIA, assistente do site de filmes WinBry+.
+        Seja simpática e use emojis 🍿.
         
         ${contextoPagina}
         
-        REGRA: Quando sugerir filmes, use SEMPRE o formato: [BUSCA:Nome do Filme].
+        ⚠️ REGRA SUPREMA DE FUNCIONAMENTO:
+        Sempre que você mencionar um filme ou série, você É OBRIGADA a usar este formato exato: [BUSCA:Nome do Filme].
+        
+        Exemplo ERRADO: "Assista Vingadores, é muito bom."
+        Exemplo CORRETO: "Assista [BUSCA:Vingadores Ultimato], é muito bom."
+        
+        Se você não usar o [BUSCA:...], o botão de assistir NÃO aparecerá para o usuário.
         `;
 
         const payload = {
@@ -1742,23 +1725,41 @@ const BryIA = {
         const data = await response.json();
 
         if (!response.ok) {
-            // Identifica erro de limite (429)
             if (response.status === 429) throw new Error("429 - Limite Atingido");
             if (response.status === 404) throw new Error("Modelo não disponível na sua conta.");
-            throw new Error(data.error?.message || "Erro na API");
+            const msgErro = (data.error && data.error.message) ? data.error.message : "Erro na API";
+            throw new Error(msgErro);
+        }
+
+        // Verifica segurança se a resposta veio vazia
+        if (!data.candidates || !data.candidates[0].content) {
+            throw new Error("A IA não retornou nada.");
         }
 
         return data.candidates[0].content.parts[0].text;
     },
 
     async processResponse(text) {
+        console.log("Resposta Bruta da IA:", text); // Para você ver no Console (F12) se a tag está vindo
+
         const searchRegex = /\[BUSCA:(.*?)\]/g;
+
+        // 1. Mostra o texto bonito (transforma a tag feia em negrito)
         let cleanText = text.replace(searchRegex, "<b>$1</b>");
         this.appendMsg(cleanText, 'bot');
 
+        // 2. Busca os filmes para criar os cards
+        // Resetamos o índice do Regex para garantir que o loop funcione do zero
+        searchRegex.lastIndex = 0;
+
         let match;
+        // O loop varre o texto procurando todas as tags [BUSCA:...]
         while ((match = searchRegex.exec(text)) !== null) {
-            await this.searchAndCreateCard(match[1]);
+            const termo = match[1].trim();
+            if (termo) {
+                console.log("Gerando card para:", termo);
+                await this.searchAndCreateCard(termo);
+            }
         }
     },
 
