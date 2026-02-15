@@ -418,6 +418,8 @@ async function loadUnlimitedUpcoming() {
     next.className = 'carousel-btn next';
     next.innerHTML = '<i class="fas fa-chevron-right"></i>';
 
+    let htmlAcumulado = ''; // 1. Cria variável
+
     combinados.forEach(item => {
         let dataFormatada = "EM BREVE";
         if (item.date_sort) {
@@ -431,15 +433,17 @@ async function loadUnlimitedUpcoming() {
         // Badge diferenciado (opcional, mas ajuda a saber se é série ou filme)
         const typeLabel = item.media_type === 'tv' ? 'SÉRIE' : 'FILME';
 
-        const html = `
-        <a href="detalhes.html?id=${item.id}&type=${item.media_type}" class="content-card upcoming-card">
-            <div style="position: relative; width: 100%; height: 100%;">
-                <img src="${poster}" alt="${titulo}" loading="lazy" style="width:100%;height:100%;object-fit:cover;">
-                <div class="date-badge">${dataFormatada}</div>
-            </div>
-        </a>`;
-        carousel.innerHTML += html;
+        htmlAcumulado += `
+    <a href="detalhes.html?id=${item.id}&type=${item.media_type}" class="content-card upcoming-card">
+        <div style="position: relative; width: 100%; height: 100%;">
+            <img src="${poster}" alt="${titulo}" loading="lazy" style="width:100%;height:100%;object-fit:cover;">
+            <div class="date-badge">${dataFormatada}</div>
+        </div>
+    </a>`;
     });
+
+    // 3. Joga na tela UMA VEZ SÓ no final do loop
+    carousel.innerHTML = htmlAcumulado;
 
     prev.onclick = () => carousel.scrollBy({ left: -300, behavior: 'smooth' });
     next.onclick = () => carousel.scrollBy({ left: 300, behavior: 'smooth' });
@@ -913,17 +917,40 @@ function setupHeroBanner(item) {
 function renderCarousel(sectionId, title, items, type) {
     const section = document.getElementById(sectionId);
     if (!section) return;
+
     const container = section.querySelector('.container');
+
+    // 1. Limpa e coloca o título
     container.innerHTML = `<h2>${title}</h2>`;
+
     const wrapper = document.createElement('div');
     wrapper.className = 'carousel-wrapper';
+
     const carousel = document.createElement('div');
     carousel.className = 'carousel';
-    items.forEach(item => carousel.innerHTML += createCardHTML(item, type));
 
-    const prev = document.createElement('button'); prev.className = 'carousel-btn prev'; prev.innerHTML = '<i class="fas fa-chevron-left"></i>';
+    // --- A CORREÇÃO MÁGICA AQUI ---
+    // Criamos uma variável na memória para guardar todo o HTML
+    let htmlAcumulado = '';
+
+    items.forEach(item => {
+        // Soma o HTML na variável (super rápido)
+        htmlAcumulado += createCardHTML(item, type);
+    });
+
+    // Joga na tela UMA VEZ SÓ (a TV agradece!)
+    carousel.innerHTML = htmlAcumulado;
+    // -----------------------------
+
+    // Botões de Navegação
+    const prev = document.createElement('button');
+    prev.className = 'carousel-btn prev';
+    prev.innerHTML = '<i class="fas fa-chevron-left"></i>';
     prev.onclick = () => carousel.scrollBy({ left: -300, behavior: 'smooth' });
-    const next = document.createElement('button'); next.className = 'carousel-btn next'; next.innerHTML = '<i class="fas fa-chevron-right"></i>';
+
+    const next = document.createElement('button');
+    next.className = 'carousel-btn next';
+    next.innerHTML = '<i class="fas fa-chevron-right"></i>';
     next.onclick = () => carousel.scrollBy({ left: 300, behavior: 'smooth' });
 
     wrapper.append(prev, carousel, next);
@@ -1114,7 +1141,9 @@ function initMinhaConta() {
         // ABRIR POP-UP
         btnEdit.onclick = () => {
             // Preenche apenas o nome
-            document.getElementById('edit-name').value = userData?.username || currentUser.displayName || "";
+            // Removemos o ?. e usamos verificação segura
+            const nomeSalvo = (userData && userData.username) ? userData.username : "";
+            document.getElementById('edit-name').value = nomeSalvo || currentUser.displayName || "";
             modal.classList.add('active');
         };
 
@@ -1163,8 +1192,11 @@ function initHeaderUser() {
     const btn = document.getElementById('user-action');
     if (!btn) return;
     if (currentUser) {
-        const img = userData?.profileImage || 'images/favicon.png';
-        const nome = userData?.username?.split(' ')[0] || 'Perfil';
+        // Verifica se userData existe antes de pegar a foto
+        const img = (userData && userData.profileImage) ? userData.profileImage : 'images/favicon.png';
+
+        // Verifica se userData existe antes de pegar o nome e fazer o split
+        const nome = (userData && userData.username) ? userData.username.split(' ')[0] : 'Perfil';
         btn.innerHTML = `<img src="${img}" style="width:28px;height:28px;border-radius:50%;margin-right:8px;object-fit:cover;"> ${nome}`;
         btn.href = 'minha-conta.html';
         btn.classList.remove('btn-primary');
@@ -1302,7 +1334,8 @@ function toggleMinhaLista(item, btn) {
 
 function updateListaButton(btn, id) {
     if (!userData || !btn) return;
-    const exists = userData.minhaLista?.some(i => String(i.id) === String(id));
+    // Verifica se a lista existe antes de rodar o .some()
+    const exists = (userData.minhaLista && userData.minhaLista.some(i => String(i.id) === String(id)));
     if (exists) {
         btn.innerHTML = '<i class="fas fa-check"></i> Na Lista';
         btn.classList.add('active');
@@ -1368,7 +1401,8 @@ function initSaveButton() {
 
 function loadContinueWatching() {
     const section = document.getElementById('continue-watching-section');
-    if (!section || !userData?.history?.length) {
+    // Verificação manual completa
+    if (!section || !userData || !userData.history || !userData.history.length) {
         if (section) section.style.display = 'none';
         return;
     }
@@ -1659,9 +1693,8 @@ const BryIA = {
             const loadEl = document.getElementById(loadingId);
             if (loadEl) loadEl.remove();
 
-            // Tratamento Elegante de Erros
             if (error.message.includes('429')) {
-                this.appendMsg("😴 Atingi meu limite de pensamentos por agora. Tente daqui a pouco!", 'bot');
+                this.appendMsg("😴 Estou descansando um pouco. Tente novamente em alguns segundos!", 'bot');
             } else {
                 console.error("BryIA Error:", error);
                 this.appendMsg(`Erro: ${error.message}`, 'bot');
@@ -1670,42 +1703,42 @@ const BryIA = {
     },
 
     async callGemini(prompt, key) {
-        const modelName = "gemini-2.5-flash"; // ou gemini-1.5-flash se preferir
+        // MUDANÇA 1: Usando o modelo 1.5 Flash que é muito obediente e rápido
+        const modelName = "gemini-2.5-flash"; 
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`;
 
-        // --- CONTEXTO INTELIGENTE (LÊ A TELA) ---
+        // Contexto simples
         let contextoPagina = "";
-
-        // Verifica se está vendo um filme/série
         const tituloNaTela = document.querySelector('.info-text h1');
         if (tituloNaTela) {
-            const titulo = tituloNaTela.innerText;
-            const elNota = document.querySelector('.star-rating');
-            const nota = elNota ? elNota.innerText : "N/A";
-            const elSinopse = document.querySelector('#synopsis-content');
-            const sinopse = elSinopse ? elSinopse.innerText : "";
-
-            contextoPagina = `
-            CONTEXTO: O usuário está na página do filme: "${titulo}". Nota: ${nota}.
-            `;
+            contextoPagina = `O usuário está vendo o filme: "${tituloNaTela.innerText}".`;
         } else if (window.location.pathname.includes('minha-lista')) {
-            contextoPagina = "CONTEXTO: O usuário está na 'Minha Lista'.";
+            contextoPagina = "O usuário está na 'Minha Lista'.";
         }
 
-        // --- A CORREÇÃO PRINCIPAL ESTÁ AQUI (INSTRUÇÃO MAIS FORTE) ---
+        // MUDANÇA 2: Prompt focado em EXEMPLOS (Few-Shot Learning) e BREVIDADE
         const systemInstruction = `
-        Você é a BryIA, assistente do site de filmes WinBry+.
-        Seja simpática e use emojis 🍿.
-        
+        Você é a BryIA, assistente do WinBry+.
         ${contextoPagina}
+
+        SUA MISSÃO:
+        1. Ser simpática, usar emojis 🍿 e falar POUCO (Máximo 2 frases curtas).
+        2. Para sugerir filmes, você É OBRIGADA a usar o formato: [BUSCA:Nome do Filme].
+        3. Nunca liste filmes apenas com texto. Se citar, use o código [BUSCA:...].
+
+        --- EXEMPLOS OBRIGATÓRIOS DE RESPOSTA (IMITE ISSO) ---
+
+        Usuário: "Quero um romance triste."
+        BryIA: "Prepare os lencinhos! 😭 Recomendo muito assistir [BUSCA:A Culpa é das Estrelas]. Outra opção linda é [BUSCA:Como Eu Era Antes de Você]."
+
+        Usuário: "Filme de ação."
+        BryIA: "Com certeza! 💥 Você precisa ver [BUSCA:John Wick 4] ou o clássico [BUSCA:Mad Max: Estrada da Fúria]."
+
+        Usuário: "Me indica uma série."
+        BryIA: "Você vai adorar [BUSCA:Stranger Things]! 👾 É viciante do começo ao fim."
         
-        ⚠️ REGRA SUPREMA DE FUNCIONAMENTO:
-        Sempre que você mencionar um filme ou série, você É OBRIGADA a usar este formato exato: [BUSCA:Nome do Filme].
-        
-        Exemplo ERRADO: "Assista Vingadores, é muito bom."
-        Exemplo CORRETO: "Assista [BUSCA:Vingadores Ultimato], é muito bom."
-        
-        Se você não usar o [BUSCA:...], o botão de assistir NÃO aparecerá para o usuário.
+        -------------------------------------------------------
+        Responda seguindo esses exemplos, com brevidade e usando a tag [BUSCA:...].
         `;
 
         const payload = {
@@ -1726,67 +1759,84 @@ const BryIA = {
 
         if (!response.ok) {
             if (response.status === 429) throw new Error("429 - Limite Atingido");
-            if (response.status === 404) throw new Error("Modelo não disponível na sua conta.");
             const msgErro = (data.error && data.error.message) ? data.error.message : "Erro na API";
             throw new Error(msgErro);
         }
 
-        // Verifica segurança se a resposta veio vazia
         if (!data.candidates || !data.candidates[0].content) {
-            throw new Error("A IA não retornou nada.");
+            throw new Error("Sem resposta da IA.");
         }
 
         return data.candidates[0].content.parts[0].text;
     },
 
     async processResponse(text) {
-        console.log("Resposta Bruta da IA:", text); // Para você ver no Console (F12) se a tag está vindo
+        console.log("Resposta IA:", text);
 
         const searchRegex = /\[BUSCA:(.*?)\]/g;
 
-        // 1. Mostra o texto bonito (transforma a tag feia em negrito)
+        // Remove as tags [BUSCA:...] do texto visível para não ficar feio
+        // A IA vai mandar: "Veja [BUSCA:Batman], é legal."
+        // O usuário vai ler: "Veja Batman, é legal." (E o card aparecerá embaixo)
         let cleanText = text.replace(searchRegex, "<b>$1</b>");
+        
         this.appendMsg(cleanText, 'bot');
 
-        // 2. Busca os filmes para criar os cards
-        // Resetamos o índice do Regex para garantir que o loop funcione do zero
+        // Reinicia regex
         searchRegex.lastIndex = 0;
-
         let match;
-        // O loop varre o texto procurando todas as tags [BUSCA:...]
+        
+        // Gera os cards
         while ((match = searchRegex.exec(text)) !== null) {
             const termo = match[1].trim();
             if (termo) {
-                console.log("Gerando card para:", termo);
                 await this.searchAndCreateCard(termo);
             }
         }
     },
 
     async searchAndCreateCard(query) {
-        const data = await fetchTMDB(`/search/multi?query=${encodeURIComponent(query)}&include_adult=false&language=pt-BR`);
-        if (data && data.results && data.results.length > 0) {
-            const bestMatch = data.results.find(i => i.media_type === 'movie' || i.media_type === 'tv');
-            if (bestMatch) this.createCardHtml(bestMatch);
+        try {
+            const data = await fetchTMDB(`/search/multi?query=${encodeURIComponent(query)}&include_adult=false&language=pt-BR`);
+            if (data && data.results && data.results.length > 0) {
+                // Prioriza filmes ou séries que tenham poster
+                const bestMatch = data.results.find(i => (i.media_type === 'movie' || i.media_type === 'tv') && i.poster_path);
+                
+                if (bestMatch) {
+                    this.createCardHtml(bestMatch);
+                }
+            }
+        } catch (e) {
+            console.error("Erro ao buscar filme para card:", e);
         }
     },
 
     createCardHtml(item) {
         const div = document.createElement('div');
         div.className = 'message bot';
+        
+        // Estilo Inline para garantir visual limpo sem depender do CSS externo
+        div.style.background = "transparent";
+        div.style.padding = "0";
+        div.style.marginTop = "5px";
+        div.style.maxWidth = "85%";
+
         const poster = item.poster_path ? `${IMG_BASE}${item.poster_path}` : 'images/favicon.png';
         const title = item.title || item.name;
         const year = (item.release_date || item.first_air_date || '????').substring(0, 4);
         const type = item.media_type || 'movie';
 
         div.innerHTML = `
-            <div class="bryia-card">
-                <img src="${poster}" onerror="this.src='images/favicon.png'">
-                <div class="bryia-card-info">
-                    <h4>${title} <small>(${year})</small></h4>
-                    <a href="detalhes.html?id=${item.id}&type=${type}" class="btn-play-mini"><i class="fas fa-play"></i> Ver</a>
+            <div class="bryia-card" style="display: flex; gap: 10px; background: #222; padding: 10px; border-radius: 8px; border: 1px solid #333; align-items: center;">
+                <img src="${poster}" style="width: 50px; height: 75px; object-fit: cover; border-radius: 4px;" onerror="this.src='images/favicon.png'">
+                <div class="bryia-card-info" style="display: flex; flex-direction: column; gap: 5px;">
+                    <h4 style="margin: 0; color: white; font-size: 0.9rem;">${title} <small style="color: #888;">(${year})</small></h4>
+                    <a href="detalhes.html?id=${item.id}&type=${type}" class="btn-play-mini" style="background: #e50914; color: white; text-decoration: none; padding: 4px 10px; border-radius: 4px; font-size: 0.8rem; text-align: center; width: fit-content; display: inline-flex; align-items: center; gap: 5px;">
+                        <i class="fas fa-play"></i> Assistir
+                    </a>
                 </div>
             </div>`;
+            
         this.elements.msgs.appendChild(div);
         this.elements.msgs.scrollTop = this.elements.msgs.scrollHeight;
     },
@@ -1794,8 +1844,6 @@ const BryIA = {
     appendMsg(text, sender, isLoading = false) {
         const div = document.createElement('div');
         div.className = `message ${sender}`;
-
-        // CORREÇÃO: Agora damos um nome (ID) para a bolinha, assim podemos achá-la para apagar depois
         if (isLoading) div.id = 'loading-msg';
 
         div.innerHTML = isLoading
@@ -1804,8 +1852,6 @@ const BryIA = {
 
         this.elements.msgs.appendChild(div);
         this.elements.msgs.scrollTop = this.elements.msgs.scrollHeight;
-
-        // Retorna o nome para a função sendMessage usar
         return isLoading ? 'loading-msg' : null;
     }
 };
@@ -2054,4 +2100,62 @@ function initGlobalLoader() {
             }, 1000);
         }
     });
+}
+
+// --- FUNÇÕES DE AUTH QUE FALTAVAM ---
+
+function initLogin(form) {
+    form.onsubmit = async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('email').value;
+        const senha = document.getElementById('senha').value;
+        const btn = form.querySelector('button');
+
+        try {
+            btn.disabled = true;
+            btn.innerText = "Entrando...";
+            await auth.signInWithEmailAndPassword(email, senha);
+            window.location.href = 'index.html';
+        } catch (error) {
+            btn.disabled = false;
+            btn.innerText = "Entrar";
+            const msg = (typeof getFirebaseErrorMessage === 'function') ? getFirebaseErrorMessage(error) : error.message;
+            showToast(msg, "error");
+        }
+    }
+}
+
+function initCadastro(form) {
+    form.onsubmit = async (e) => {
+        e.preventDefault();
+        const nome = document.getElementById('nome').value;
+        const email = document.getElementById('email').value;
+        const senha = document.getElementById('senha').value;
+        const confSenha = document.getElementById('confirmar-senha').value;
+
+        if (senha !== confSenha) return showToast("As senhas não coincidem", "error");
+
+        try {
+            showToast("Criando conta...", "info");
+            const userCred = await auth.createUserWithEmailAndPassword(email, senha);
+
+            // Salva nome
+            await userCred.user.updateProfile({ displayName: nome });
+
+            // Cria no Banco
+            await db.collection('users').doc(userCred.user.uid).set({
+                username: nome,
+                email: email,
+                minhaLista: [],
+                history: []
+            });
+
+            showToast("Conta criada com sucesso!", "success");
+            setTimeout(() => window.location.href = 'index.html', 1500);
+
+        } catch (error) {
+            const msg = (typeof getFirebaseErrorMessage === 'function') ? getFirebaseErrorMessage(error) : error.message;
+            showToast(msg, "error");
+        }
+    }
 }
