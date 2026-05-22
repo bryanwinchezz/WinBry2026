@@ -84,19 +84,38 @@ auth.onAuthStateChanged(async (user) => {
         if (bryiaBtn) bryiaBtn.style.display = 'flex';
         if (surpriseBtn) surpriseBtn.style.display = 'flex';
 
-        // Pega os dados do banco (Minha Lista, etc)
-        const doc = await db.collection('users').doc(user.uid).get();
-        if (doc.exists) {
-            userData = doc.data();
-        } else {
-            // Se for novo usuário no banco, cria o documento inicial
+        // Pega os dados do banco (Minha Lista, etc) com tratamento robusto contra falhas
+        try {
+            const doc = await db.collection('users').doc(user.uid).get();
+            if (doc.exists) {
+                userData = doc.data();
+                if (!userData.reviews) userData.reviews = [];
+                if (!userData.favoritos) userData.favoritos = [];
+                if (!userData.minhaLista) userData.minhaLista = [];
+                if (!userData.history) userData.history = [];
+            } else {
+                // Se for novo usuário no banco, cria o documento inicial
+                userData = {
+                    username: user.displayName || "Usuário",
+                    email: user.email,
+                    minhaLista: [],
+                    history: [],
+                    reviews: [],
+                    favoritos: []
+                };
+                await db.collection('users').doc(user.uid).set(userData);
+            }
+        } catch (dbError) {
+            console.error("Erro ao carregar dados do usuário do banco (Firestore):", dbError);
+            // Fallback resiliente em caso de falha de conexão/permissões temporárias
             userData = {
                 username: user.displayName || "Usuário",
                 email: user.email,
                 minhaLista: [],
-                history: []
+                history: [],
+                reviews: [],
+                favoritos: []
             };
-            await db.collection('users').doc(user.uid).set(userData);
         }
     } else {
         console.log("Nenhum usuário conectado.");
@@ -106,27 +125,61 @@ auth.onAuthStateChanged(async (user) => {
         // --- ESCONDE OS BOTÕES FLUTUANTES ---
         if (bryiaBtn) bryiaBtn.style.display = 'none';
         if (surpriseBtn) surpriseBtn.style.display = 'none';
+
+        // --- REDIRECIONAMENTO DE SEGURANÇA SEGURO ---
+        // Se estiver em uma página restrita que necessita de login, avisa e redireciona
+        const path = window.location.pathname;
+        if (path.includes('minha-conta') || path.includes('minha-lista')) {
+            showToast("Você precisa fazer login para acessar esta página!", "warning");
+            setTimeout(() => {
+                window.location.href = 'login.html';
+            }, 1000);
+        }
     }
+
+    // Sinaliza que a autenticação foi resolvida (prevenindo travamento infinito)
+    window.isAuthResolved = true;
 
     // Atualiza a interface (Botão de Perfil/Login)
     initHeaderUser();
 
-    // Se estiver na página "Minha Lista" ou "Home", recarrega
-    if (window.location.pathname.includes('minha-lista') && typeof initMinhaListaPage === 'function') initMinhaListaPage();
-    if (window.location.pathname.includes('index') && typeof loadContinueWatching === 'function') loadContinueWatching();
+    // Recarrega o histórico da BryIA correspondente ao perfil logado!
+    if (typeof BryIA !== 'undefined' && typeof BryIA.loadLocalHistory === 'function') {
+        BryIA.loadLocalHistory();
+    }
+
+    // Se estiver na página "Minha Lista", "Home" ou "Dashboard Perfil", recarrega
+    if (document.getElementById('lista-container') && typeof initMinhaListaPage === 'function') initMinhaListaPage();
+    if ((document.getElementById('hero-section') || document.querySelector('.continue-watching-section') || document.querySelector('.main-slider')) && typeof loadContinueWatching === 'function') loadContinueWatching();
+    if (document.querySelector('.dashboard-wrapper') && typeof initMinhaConta === 'function') initMinhaConta();
+
+    // Se estiver na página de detalhes, atualiza os botões ao resolver a autenticação (Verificação robusta pelo DOM)
+    const btnLista = document.getElementById('btn-add-lista');
+    const btnFavorito = document.getElementById('btn-add-favorito');
+    if (btnLista || btnFavorito) {
+        const urlParams = new URLSearchParams(window.location.search);
+        const itemId = urlParams.get('id');
+        if (itemId) {
+            if (btnLista && typeof updateListaButton === 'function') updateListaButton(btnLista, itemId);
+            if (btnFavorito && typeof updateFavoritoButton === 'function') updateFavoritoButton(btnFavorito, itemId);
+        }
+    }
 });
 
-// Helper para salvar dados no banco automaticamente
+// Helper aprimorado para salvar dados no banco automaticamente de forma resiliente
 async function saveUserDataToCloud() {
     if (!currentUser || !userData) return;
     try {
-        await db.collection('users').doc(currentUser.uid).update({
-            minhaLista: userData.minhaLista,
-            history: userData.history,
-            profileImage: userData.profileImage || null
-        });
+        // Usar .set com { merge: true } garante a criação do documento se não existir
+        await db.collection('users').doc(currentUser.uid).set({
+            minhaLista: userData.minhaLista || [],
+            history: userData.history || [],
+            profileImage: userData.profileImage || null,
+            reviews: userData.reviews || [],
+            favoritos: userData.favoritos || []
+        }, { merge: true });
     } catch (error) {
-        console.error("Erro ao salvar:", error);
+        console.error("Erro ao salvar dados no Firestore:", error);
     }
 }
 
@@ -156,7 +209,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (document.getElementById("cadastroForm")) initCadastro(document.getElementById("cadastroForm"));
     if (document.getElementById("loginForm")) initLogin(document.getElementById("loginForm"));
-    if (document.querySelector('.account-info-card')) initMinhaConta();
+    if (document.querySelector('.dashboard-wrapper')) initMinhaConta();
 
     // Roteamento
     const path = window.location.pathname;
@@ -167,19 +220,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Verifica se veio do botão da Home (Hubs como Marvel, DC)
     const isHub = params.get('global') === 'true';
+    const isMulti = params.get('multi') === 'true';
+    if (isMulti) {
+        document.querySelectorAll('.main-nav ul li a, .bottom-nav a, .bottom-nav .nav-item').forEach(el => el.classList.remove('active'));
+    }
 
     // AQUI ESTÁ A CORREÇÃO: Removemos o ".html" das verificações
     if (path.includes('detalhes')) {
         if (id && type) loadDetails(type, id);
     }
     else if (path.includes('filmes')) {
-        currentType = 'movie';
-        if (search) handleSearchRouting(search, 'movie', isHub);
+        currentType = isMulti ? 'search' : 'movie';
+        const genre = params.get('genre');
+        const lang = params.get('lang');
+        if (search) handleSearchRouting(search, isMulti ? 'multi' : 'movie', isHub);
+        else if (genre) loadCatalog('movie', 1, genre, lang || null);
         else loadCatalog('movie', 1);
     }
     else if (path.includes('series')) {
         currentType = 'tv';
+        const genre = params.get('genre');
+        const lang = params.get('lang');
         if (search) loadSearch(search, 'tv', 1);
+        else if (genre) loadCatalog('tv', 1, genre, lang || null);
         else loadCatalog('tv', 1);
     }
     else if (path.includes('animes')) {
@@ -226,6 +289,26 @@ async function fetchTMDB(endpoint) {
     } catch (error) { console.error("Erro TMDB:", error); return null; }
 }
 
+// Filtra conteúdo adulto / hentai de animes para garantir segurança familiar
+function filterAdultAnimes(results) {
+    if (!results) return [];
+    const blacklist = [
+        'hentai', 'uncensored', 'erotic', 'erótica', 'erótico', 'sexy anime', 
+        'adult anime', 'ecchi', 'orgasm', 'sex', 'sexual', 'sadomaso', 
+        'blowjob', 'creampie', 'sensual', 'yuri', 'yaoi', 'hentai anime',
+        'overflow', 'yosuga no sora', 'boku no pico', 'kiss x sis', 'valkyrie drive', 
+        'redo of healer', 'kaifuku jutsushi', 'ishuzoku reviewers', 'shoujo ramune',
+        'residence', 'front inn', 'under-content', 'kuroinu', 'disciplined',
+        'overflow: tenkousei', 'overflowing'
+    ];
+    return results.filter(item => {
+        const title = (item.title || item.name || '').toLowerCase();
+        const overview = (item.overview || '').toLowerCase();
+        const hasBlockedWord = blacklist.some(word => title.includes(word) || overview.includes(word));
+        return !hasBlockedWord;
+    });
+}
+
 // =================================================================
 // ATUALIZAÇÃO DA HOME (Misto de Filmes e Séries)
 // =================================================================
@@ -262,12 +345,15 @@ async function loadHome() {
     const series = await fetchTMDB('/trending/tv/week');
     if (series && series.results) renderCarousel('series-em-alta-section', 'Séries em Alta', series.results, 'tv');
 
-    // 6. Animes
-    const animes = await fetchTMDB('/discover/tv?with_genres=16&with_original_language=ja&sort_by=popularity.desc');
-    if (animes && animes.results) renderCarousel('animes-recomendados-section', 'Animes Recomendados', animes.results, 'tv');
+    // 6. Animes (com filtro estrito anti-hentai)
+    const animes = await fetchTMDB('/discover/tv?with_genres=16&with_original_language=ja&sort_by=popularity.desc&include_adult=false&without_keywords=9819');
+    if (animes && animes.results) {
+        const animesFiltrados = filterAdultAnimes(animes.results);
+        renderCarousel('animes-recomendados-section', 'Animes Recomendados', animesFiltrados, 'tv');
+    }
 }
 
-// --- NOVA FUNÇÃO: CATEGORIAS COM SETAS E MAIS OPÇÕES ---
+// --- NOVA FUNÇÃO: CATEGORIAS COM SETAS - LÓGICA DE GÊNEROS REAIS ---
 async function loadCategoriesCarousel() {
     const sectionId = 'categorias-section';
     const container = document.getElementById(sectionId);
@@ -287,60 +373,58 @@ async function loadCategoriesCarousel() {
     const btnPrev = container.querySelector('.prev');
     const btnNext = container.querySelector('.next');
 
-    // Lista Expandida de Categorias
+    // Categorias com URLs de FILTRO POR GÊNERO (não pesquisa)
+    // url usa ?genre=ID para filmes.html/series.html exibirem via loadCatalog
     const categorias = [
-        { id: 28, name: 'Ação', type: 'movie' },
-        { id: 12, name: 'Aventura', type: 'movie' },
-        { id: 16, name: 'Animes', type: 'tv' }, // Anime é TV geralmente
-        { id: 35, name: 'Comédia', type: 'movie' },
-        { id: 80, name: 'Crime', type: 'movie' },
-        { id: 99, name: 'Documentário', type: 'movie' },
-        { id: 18, name: 'Drama', type: 'movie' },
-        { id: 10751, name: 'Família', type: 'movie' },
-        { id: 14, name: 'Fantasia', type: 'movie' },
-        { id: 36, name: 'História', type: 'movie' },
-        { id: 27, name: 'Terror', type: 'movie' },
-        { id: 10402, name: 'Música', type: 'movie' },
-        { id: 9648, name: 'Mistério', type: 'movie' },
-        { id: 10749, name: 'Romance', type: 'movie' },
-        { id: 878, name: 'Ficção Científica', type: 'movie' },
-        { id: 10752, name: 'Guerra', type: 'movie' },
-        { id: 37, name: 'Faroeste', type: 'movie' }
+        { id: 28,    name: 'Ação',            type: 'movie', url: 'filmes.html?genre=28' },
+        { id: 12,    name: 'Aventura',        type: 'movie', url: 'filmes.html?genre=12' },
+        { id: 16,    name: 'Animes',          type: 'tv',    url: 'animes.html', endpoint: '/discover/tv?with_genres=16&with_original_language=ja&sort_by=popularity.desc&include_adult=false' },
+        { id: 18,    name: 'Dorama',          type: 'tv',    url: 'series.html?genre=18&lang=ko', endpoint: '/discover/tv?with_original_language=ko&sort_by=popularity.desc' },
+        { id: 35,    name: 'Comédia',         type: 'movie', url: 'filmes.html?genre=35' },
+        { id: 80,    name: 'Crime',           type: 'movie', url: 'filmes.html?genre=80' },
+        { id: 99,    name: 'Documentário',    type: 'movie', url: 'filmes.html?genre=99' },
+        { id: 18,    name: 'Drama',           type: 'movie', url: 'filmes.html?genre=18' },
+        { id: 10751, name: 'Família',         type: 'movie', url: 'filmes.html?genre=10751' },
+        { id: 14,    name: 'Fantasia',        type: 'movie', url: 'filmes.html?genre=14' },
+        { id: 36,    name: 'História',        type: 'movie', url: 'filmes.html?genre=36' },
+        { id: 27,    name: 'Terror',          type: 'movie', url: 'filmes.html?genre=27' },
+        { id: 10402, name: 'Música',          type: 'movie', url: 'filmes.html?genre=10402' },
+        { id: 9648,  name: 'Mistério',        type: 'movie', url: 'filmes.html?genre=9648' },
+        { id: 10749, name: 'Romance',         type: 'movie', url: 'filmes.html?genre=10749' },
+        { id: 878,   name: 'Ficção Científica',type: 'movie', url: 'filmes.html?genre=878' },
+        { id: 10752, name: 'Guerra',          type: 'movie', url: 'filmes.html?genre=10752' },
+        { id: 37,    name: 'Faroeste',        type: 'movie', url: 'filmes.html?genre=37' }
     ];
 
-    let html = '';
-
-    // 1. Criamos um conjunto externo para guardar os IDs dos filmes já usados
     const usedIds = new Set();
 
-    // Carregamento paralelo
     const promessas = categorias.map(async (cat) => {
-        // Pega os filmes da categoria
-        const data = await fetchTMDB(`/discover/${cat.type}?with_genres=${cat.id}&sort_by=popularity.desc&page=1`);
+        let endpoint = cat.endpoint;
+        if (!endpoint) {
+            const yearParam = cat.type === 'tv' ? 'first_air_date.gte=2020-01-01' : 'primary_release_date.gte=2020-01-01';
+            endpoint = `/discover/${cat.type}?with_genres=${cat.id}&sort_by=popularity.desc&${yearParam}`;
+        }
+
+        const data = await fetchTMDB(endpoint);
         const results = (data && data.results) ? data.results : [];
 
-        // 2. Lógica de Seleção Única:
-        // Procura na lista o primeiro filme que tenha imagem E que ainda não esteja no conjunto 'usedIds'
         let selectedItem = results.find(item => item.backdrop_path && !usedIds.has(item.id));
 
-        // Fallback: Se não achou nenhum único (raro) ou a lista acabou, pega um aleatório dos top 10 para variar
         if (!selectedItem && results.length > 0) {
             const randomIndex = Math.floor(Math.random() * Math.min(10, results.length));
             selectedItem = results[randomIndex];
         }
 
-        // 3. Adiciona o ID escolhido ao conjunto para não ser usado na próxima categoria
         if (selectedItem) {
             usedIds.add(selectedItem.id);
         }
 
-        // Define o background usando o item escolhido
         const bg = (selectedItem && selectedItem.backdrop_path)
             ? `https://image.tmdb.org/t/p/w500${selectedItem.backdrop_path}`
             : 'images/banner-filme.jpg';
 
         return `
-        <a href="${cat.type === 'tv' ? 'animes.html' : 'filmes.html'}?search=${cat.name}" class="category-card">
+        <a href="${cat.url}" class="category-card">
             <img src="${bg}" loading="lazy" alt="${cat.name}">
             <div class="category-overlay">
                 <h3>${cat.name}</h3>
@@ -351,10 +435,10 @@ async function loadCategoriesCarousel() {
     const resultados = await Promise.all(promessas);
     carouselInner.innerHTML = resultados.join('');
 
-    // Ativa os botões
     btnPrev.onclick = () => carouselInner.scrollBy({ left: -400, behavior: 'smooth' });
     btnNext.onclick = () => carouselInner.scrollBy({ left: 400, behavior: 'smooth' });
 }
+
 
 // --- FUNÇÃO: EM BREVE MISTO (FILMES E SÉRIES) ---
 async function loadUnlimitedUpcoming() {
@@ -548,32 +632,96 @@ function renderUpcomingCarousel(sectionId, title, items) {
 
 // --- FUNÇÕES DE CARREGAMENTO (COM TRAVA DE 500 PÁGINAS) ---
 
-async function loadCatalog(type, page) {
+async function loadCatalog(type, page, genreId, langFilter) {
     currentPage = page;
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
-    const endpoint = `/discover/${type}?sort_by=popularity.desc&include_adult=false&page=${page}`;
-    const data = await fetchTMDB(endpoint);
+    let results = [];
+    let totalPages = 1;
+    let gridType = type;
 
-    const titulo = type === 'movie' ? 'Filmes' : 'Séries';
+    let titulo = type === 'movie' ? 'Filmes' : 'Séries';
+    if (genreId) {
+        const generoNomes = {
+            '28': 'Ação',
+            '12': 'Aventura',
+            '35': 'Comédia',
+            '80': 'Crime',
+            '99': 'Documentário',
+            '18': langFilter === 'ko' ? 'Dorama' : 'Drama',
+            '10751': 'Família',
+            '14': 'Fantasia',
+            '36': 'História',
+            '27': 'Terror',
+            '10402': 'Música',
+            '9648': 'Mistério',
+            '10749': 'Romance',
+            '878': 'Ficão Científica',
+            '10752': 'Guerra',
+            '37': 'Faroeste'
+        };
+        const nomeGenero = generoNomes[String(genreId)];
+        if (nomeGenero) {
+            titulo = nomeGenero === 'Ficão Científica' ? 'Ficção Científica' : nomeGenero;
+        }
 
-    // TRAVA DE SEGURANÇA: API do TMDB limita a 500 páginas para acesso público
-    const totalPages = Math.min(data.total_pages, 500);
+        // Para categorias, carregamos filmes e séries juntos de forma premium!
+        const tvGenreMap = {
+            '28': '10759', '12': '10759', '35': '35', '80': '80', '99': '99',
+            '18': '18', '10751': '10751', '14': '10765', '36': '10768',
+            '27': '9648', '10402': '', '9648': '9648', '10749': '10749',
+            '878': '10765', '10752': '10768', '37': '37'
+        };
 
-    renderGrid(data.results, type, titulo);
-    renderPagination(totalPages, page, (p) => loadCatalog(type, p));
+        const tvGenreId = tvGenreMap[String(genreId)];
+        let extra = langFilter ? `&with_original_language=${langFilter}` : '';
+
+        // Buscas paralelas para Cinema e TV
+        const reqMovie = fetchTMDB(`/discover/movie?with_genres=${genreId}&sort_by=popularity.desc&include_adult=false&page=${page}${extra}`);
+        
+        let reqTV;
+        if (tvGenreId) {
+            reqTV = fetchTMDB(`/discover/tv?with_genres=${tvGenreId}&sort_by=popularity.desc&include_adult=false&page=${page}${extra}`);
+        } else {
+            reqTV = Promise.resolve({ results: [], total_pages: 0 });
+        }
+
+        const [resMovie, resTV] = await Promise.all([reqMovie, reqTV]);
+
+        const movies = (resMovie && resMovie.results) ? resMovie.results.map(i => { i.media_type = 'movie'; return i; }) : [];
+        const tvs = (resTV && resTV.results) ? resTV.results.map(i => { i.media_type = 'tv'; return i; }) : [];
+
+        results = [...movies, ...tvs];
+        // Ordenação robusta baseada em popularidade
+        results.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+
+        const maxPages = Math.max(resMovie ? resMovie.total_pages || 0 : 0, resTV ? resTV.total_pages || 0 : 0);
+        totalPages = Math.min(maxPages, 500);
+        gridType = 'multi';
+    } else {
+        const endpoint = `/discover/${type}?sort_by=popularity.desc&include_adult=false&page=${page}`;
+        const data = await fetchTMDB(endpoint);
+        results = (data && data.results) ? data.results : [];
+        totalPages = Math.min(data ? data.total_pages || 1 : 1, 500);
+    }
+
+    renderGrid(results, gridType, titulo);
+    renderPagination(totalPages, page, (p) => loadCatalog(type, p, genreId, langFilter));
 }
+
 
 async function loadAnimes(page) {
     currentPage = page;
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
-    const endpoint = `/discover/tv?with_genres=16&with_original_language=ja&sort_by=popularity.desc&include_adult=false&page=${page}`;
+    const endpoint = `/discover/tv?with_genres=16&with_original_language=ja&sort_by=popularity.desc&include_adult=false&without_keywords=9819&page=${page}`;
     const data = await fetchTMDB(endpoint);
 
     const totalPages = Math.min(data.total_pages, 500);
 
-    renderGrid(data.results, 'tv', 'Animes');
+    const animesFiltrados = filterAdultAnimes((data && data.results) || []);
+
+    renderGrid(animesFiltrados, 'tv', 'Animes');
     renderPagination(totalPages, page, (p) => loadAnimes(p));
 }
 
@@ -586,7 +734,17 @@ async function loadSearch(query, type, page) {
 
     const totalPages = Math.min(data.total_pages, 500);
 
-    renderGrid(data.results, type, `Busca: "${query}"`);
+    let results = data.results || [];
+    if (type === 'multi') {
+        results = results.filter(item => item.media_type === 'movie' || item.media_type === 'tv');
+    }
+    results = filterAdultAnimes(results);
+
+    const titleText = type === 'multi' 
+        ? `<span class="pesquisa-destaque">Pesquisa Global:</span> "${query}"` 
+        : `Busca: "${query}"`;
+
+    renderGrid(results, type, titleText);
     renderPagination(totalPages, page, (p) => loadSearch(query, type, p));
 }
 
@@ -654,7 +812,7 @@ function renderGrid(items, type, title) {
 }
 
 function createCardHTML(item, typeOverride) {
-    const type = typeOverride || item.media_type || 'movie';
+    const type = (typeOverride && typeOverride !== 'multi') ? typeOverride : (item.media_type || 'movie');
     const poster = item.poster_path ? `${IMG_BASE}${item.poster_path}` : 'images/favicon.png';
     const titulo = item.title || item.name;
     const ano = (item.release_date || item.first_air_date || '????').substring(0, 4);
@@ -766,6 +924,41 @@ async function loadDetails(type, id) {
     if (!item) return;
     const externalIds = await fetchTMDB(`/${type}/${id}/external_ids`);
     const imdbId = externalIds ? externalIds.imdb_id : null;
+    
+    // Busca do elenco (créditos)
+    const credits = await fetchTMDB(`/${type}/${id}/credits`);
+    let atoresHtml = '';
+    if (credits && credits.cast && credits.cast.length > 0) {
+        const mainCast = credits.cast.filter(actor => actor.profile_path).slice(0, 6);
+        const finalCast = mainCast.length > 0 ? mainCast : credits.cast.slice(0, 6);
+        
+        const castItemsHtml = finalCast.map(actor => {
+            const actorPic = actor.profile_path ? `${IMG_BASE}${actor.profile_path}` : 'images/foto-generica.jpg';
+            const cleanName = actor.name.replace(/'/g, "\\'");
+            return `
+            <div class="cast-card" onclick="showFamousWorks('${actor.id}', '${cleanName}')" title="Clique para ver produções com ${actor.name}">
+                <div class="cast-avatar-wrapper">
+                    <img src="${actorPic}" alt="${actor.name}" loading="lazy" />
+                </div>
+                <div class="cast-info-name">
+                    <span class="cast-actor">${actor.name}</span>
+                    <span class="cast-character">${actor.character || ''}</span>
+                </div>
+            </div>
+            `;
+        }).join('');
+
+        atoresHtml = `
+        <div class="details-cast-section" style="margin-top: 25px;">
+            <h3 style="font-size: 1.1rem; color: #fff; margin-bottom: 12px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                <i class="fas fa-users" style="color: #e50914;"></i> Elenco Principal
+            </h3>
+            <div class="cast-grid">
+                ${castItemsHtml}
+            </div>
+        </div>
+        `;
+    }
 
     let classificacao = "L";
 
@@ -799,9 +992,9 @@ async function loadDetails(type, id) {
     const nota = item.vote_average.toFixed(1);
     const duracaoTxt = formatDuration(item.runtime, item.number_of_seasons);
 
-    // --- LÓGICA DO LER MAIS ---
+    // --- LÓGICA DO LER MAIS (Threshold aumentado para 350 caracteres) ---
     const sinopseTexto = item.overview || "Sinopse não disponível.";
-    const isLongText = sinopseTexto.length > 150;
+    const isLongText = sinopseTexto.length > 350;
     const sinopseHtml = `
         <p class="synopsis-text ${isLongText ? 'clamped' : ''}" id="synopsis-content">${sinopseTexto}</p>
         ${isLongText ? '<button id="btn-read-more" class="btn-read-more">Ler mais</button>' : ''}
@@ -823,8 +1016,11 @@ async function loadDetails(type, id) {
                     </div>
                     <div class="meta-info">
                         <span class="classificacao" style="background-color:${corClass}; padding: 4px 8px; border-radius:4px; font-weight:bold; color:white;">${classificacao}</span>
+                        <span class="separator">•</span>
                         <span>${ano}</span>
+                        <span class="separator">•</span>
                         <span>${duracaoTxt}</span>
+                        <span class="separator">•</span>
                         <span class="qualidade">HD</span>
                     </div>
                     
@@ -832,8 +1028,12 @@ async function loadDetails(type, id) {
                     <div class="actions">
                         <button class="btn btn-play" id="btn-assistir-detalhes"><i class="fas fa-play"></i> Assistir</button>
                         <button class="btn btn-lista" id="btn-add-lista"><i class="fas fa-bookmark"></i> Minha Lista</button>
+                        <button class="btn btn-favorito" id="btn-add-favorito"><i class="far fa-heart"></i> Favoritar</button>
+                        <button class="btn btn-resenha" id="btn-resenha-detalhes"><i class="fas fa-edit"></i> Resenha</button>
+                        <button class="btn btn-compartilhar" id="btn-compartilhar-detalhes"><i class="fas fa-share-alt"></i> Compartilhar</button>
                     </div>
-                    ${item.genres ? `<div class="elenco" style="margin-top:10px; color:#ccc;"><strong>Gêneros:</strong> ${item.genres.map(g => g.name).join(', ')}</div>` : ''}
+                    ${item.genres ? `<div class="elenco" style="margin-top:10px; color:#ccc; font-size: 0.95rem;"><strong>Gêneros:</strong> ${item.genres.map(g => g.name).join(', ')}</div>` : ''}
+                    ${atoresHtml}
                 </div>
             </div>
         </div>`;
@@ -876,11 +1076,6 @@ async function loadDetails(type, id) {
                 poster: poster
             });
 
-            // 4. ABRE O ANÚNCIO COM LEVE ATRASO (Delay)
-            // O setTimeout de 300ms permite que o navegador renderize o modal antes de trocar de aba
-            setTimeout(() => {
-                window.open("https://ballisticcomainvitation.com/x2wn9r0ndf?key=122b6ab9ee80122daefb717fe00bd58f", "_blank");
-            }, 300);
         });
     }
 
@@ -888,6 +1083,54 @@ async function loadDetails(type, id) {
     if (btnLista) {
         updateListaButton(btnLista, id);
         btnLista.addEventListener('click', () => toggleMinhaLista({ id, type, titulo, poster, ano }, btnLista));
+    }
+
+    const btnFavorito = document.getElementById('btn-add-favorito');
+    if (btnFavorito) {
+        updateFavoritoButton(btnFavorito, id);
+        btnFavorito.addEventListener('click', () => toggleFavorito({ id, type, titulo, poster, ano }, btnFavorito));
+    }
+
+    const btnResenha = document.getElementById('btn-resenha-detalhes');
+    if (btnResenha) {
+        btnResenha.addEventListener('click', () => {
+            if (!currentUser || !userData) {
+                return showToast("Faça login para resenhar!", "error");
+            }
+            const encodedTitle = encodeURIComponent(titulo);
+            const encodedPoster = encodeURIComponent(poster);
+            window.location.href = `minha-conta.html?action=review&id=${id}&title=${encodedTitle}&poster=${encodedPoster}&type=${type}&year=${ano}`;
+        });
+    }
+
+    const btnCompartilhar = document.getElementById('btn-compartilhar-detalhes');
+    if (btnCompartilhar) {
+        btnCompartilhar.addEventListener('click', () => {
+            const shareUrl = `${window.location.origin}${window.location.pathname}?id=${id}&type=${type}&title=${encodeURIComponent(titulo)}`;
+            const shareText = `Assista a "${titulo}" no WinBry! 🎬🍿`;
+            
+            if (navigator.share) {
+                navigator.share({
+                    title: titulo,
+                    text: shareText,
+                    url: shareUrl
+                }).then(() => {
+                    showToast("Compartilhado com sucesso!", "success");
+                }).catch((err) => {
+                    if (err.name !== 'AbortError') {
+                        showToast("Erro ao compartilhar.", "error");
+                    }
+                });
+            } else {
+                navigator.clipboard.writeText(`${shareText}\nLink: ${shareUrl}`)
+                    .then(() => {
+                        showToast("Link copiado para a área de transferência!", "success");
+                    })
+                    .catch(() => {
+                        showToast("Erro ao copiar o link.", "error");
+                    });
+            }
+        });
     }
 }
 
@@ -1041,7 +1284,9 @@ function initGoogleLogin() {
                     email: user.email,
                     profileImage: user.photoURL,
                     minhaLista: [],
-                    history: []
+                    history: [],
+                    reviews: [],
+                    favoritos: []
                 });
                 showToast("Conta criada! Redirecionando...", "success");
             } else {
@@ -1079,34 +1324,642 @@ function initGoogleLogin() {
 }
 
 function initMinhaConta() {
-    console.log("Iniciando Minha Conta...");
+    if (window.isMinhaContaInitialized) {
+        console.log("Dashboard Minha Conta já inicializado. Ignorando escuta redundante.");
+        return;
+    }
+    window.isMinhaContaInitialized = true;
+    console.log("Iniciando Dashboard Minha Conta...");
 
-    // FUNÇÃO INTERNA: Atualiza a tela com os dados reais
+    // 1. NAVEGAÇÃO DE ABAS DO DASHBOARD
+    const tabButtons = document.querySelectorAll('.nav-tab-btn');
+    const tabs = document.querySelectorAll('.dashboard-tab');
+
+    if (tabButtons.length > 0 && tabs.length > 0) {
+        tabButtons.forEach(btn => {
+            btn.onclick = () => {
+                const targetTab = btn.getAttribute('data-tab');
+                if (!targetTab) return; // Caso seja o botão de logout
+
+                // Remove active de todos
+                tabButtons.forEach(b => b.classList.remove('active'));
+                tabs.forEach(t => t.classList.remove('active'));
+
+                // Adiciona active no selecionado
+                btn.classList.add('active');
+                const targetTabEl = document.getElementById(targetTab);
+                if (targetTabEl) targetTabEl.classList.add('active');
+            };
+        });
+    }
+
+    // Botão de atalho para ir para resenhas a partir do dashboard
+    const btnGoToReviews = document.querySelector('.btn-go-to-reviews');
+    if (btnGoToReviews) {
+        btnGoToReviews.onclick = () => {
+            const reviewsTabBtn = document.querySelector('.nav-tab-btn[data-tab="tab-reviews"]');
+            if (reviewsTabBtn) reviewsTabBtn.click();
+        };
+    }
+
+    // Logout do usuário
+    const logoutBtnMinhaConta = document.querySelector('.btn-logout-danger') || document.querySelector('.btn-logout-dashboard');
+    if (logoutBtnMinhaConta) {
+        logoutBtnMinhaConta.onclick = () => {
+            auth.signOut();
+            showToast("Saiu da conta.", "info");
+            setTimeout(() => window.location.href = 'login.html', 1000);
+        };
+    }
+
+    // 2. ATUALIZAÇÃO DA TELA (UI) COM OS DADOS REAIS DO USUÁRIO
     const updateUI = () => {
         if (currentUser && userData) {
+            // Textos originais e novos da Sidebar
             const nomeEl = document.getElementById('display-username');
+            const nomeSidebar = document.getElementById('sidebar-username');
             const emailEl = document.getElementById('display-email');
+            
             const imgEl = document.getElementById('profile-pic');
+            const imgSidebar = document.getElementById('sidebar-profile-pic');
 
-            if (nomeEl) nomeEl.innerText = userData.username || currentUser.displayName || "Usuário";
+            const username = userData.username || currentUser.displayName || "Usuário";
+            const profileImg = userData.profileImage || currentUser.photoURL || 'images/foto-generica.jpg';
+
+            if (nomeEl) nomeEl.innerText = username;
+            if (nomeSidebar) nomeSidebar.innerText = username;
             if (emailEl) emailEl.innerText = currentUser.email || "";
-            // Foto vem do Google ou do Upload local (prioridade para local se houver, senão Google)
-            if (imgEl) imgEl.src = userData.profileImage || currentUser.photoURL || 'images/foto-generica.jpg';
+            
+            if (imgEl) imgEl.src = profileImg;
+            if (imgSidebar) imgSidebar.src = profileImg;
+
+            // Atualiza estatísticas do dashboard
+            updateStats();
+            // Renderiza as resenhas
+            renderReviews();
+            // Renderiza os favoritos
+            renderFavoritos();
+
+            // Oculta/Exibe o card de boas-vindas com base nas resenhas do usuário
+            const welcomeCard = document.querySelector('.overview-welcome-card');
+            if (welcomeCard) {
+                if (userData && userData.reviews && userData.reviews.length > 0) {
+                    welcomeCard.style.display = 'none';
+                } else {
+                    welcomeCard.style.display = 'block';
+                }
+            }
+        } else if (window.isAuthResolved && !currentUser) {
+            console.log("Autenticação resolvida como deslogado. Cancelando atualização recursiva da UI do perfil.");
+        } else {
+            // Se ainda não carregou os dados da nuvem, tenta novamente em 200ms recursivamente
+            // Isso evita travamento em "Carregando..." caso haja qualquer atraso na busca da nuvem
+            setTimeout(updateUI, 200);
         }
     };
 
     updateUI();
 
-    auth.onAuthStateChanged((user) => {
-        if (user) {
-            currentUser = user; // Atualiza global
-            setTimeout(updateUI, 500);
+    // 3. ATUALIZAR ESTATÍSTICAS DO DASHBOARD
+    const updateStats = () => {
+        const statCount = document.getElementById('stat-reviews-count');
+        const statAverage = document.getElementById('stat-reviews-average');
+        const statFavorites = document.getElementById('stat-favorites-count');
+        const statWatchlist = document.getElementById('stat-watchlist-count');
+
+        // Total de Resenhas
+        const reviewsCount = userData && userData.reviews ? userData.reviews.length : 0;
+        if (statCount) statCount.innerText = reviewsCount;
+
+        // Média de Notas das Resenhas
+        if (statAverage) {
+            if (reviewsCount > 0) {
+                const totalRating = userData.reviews.reduce((acc, curr) => acc + curr.rating, 0);
+                const avg = totalRating / reviewsCount;
+                statAverage.innerText = avg.toFixed(1);
+            } else {
+                statAverage.innerText = "0.0";
+            }
         }
-    });
 
-    // --- LÓGICA DE BOTÕES ---
+        // Total de Favoritos (Minhas Curtidas)
+        const favoritesCount = userData && userData.favoritos ? userData.favoritos.length : 0;
+        if (statFavorites) statFavorites.innerText = favoritesCount;
 
-    // Sair
+        // Total de Itens na Lista (Watchlist)
+        const watchlistCount = userData && userData.minhaLista ? userData.minhaLista.length : 0;
+        if (statWatchlist) statWatchlist.innerText = watchlistCount;
+    };
+
+    // 4. LÓGICA DE GERENCIAMENTO DE RESENHAS (CRUD LETTERBOXD)
+    
+    // Auxiliar: Gera o HTML estático das estrelas para a listagem
+    const generateStaticStarsHTML = (nota) => {
+        let html = '';
+        for (let index = 1; index <= 5; index++) {
+            if (index <= Math.floor(nota)) {
+                html += '<i class="fas fa-star"></i>';
+            } else if (index === Math.ceil(nota) && nota % 1 !== 0) {
+                html += '<i class="fas fa-star-half-alt"></i>';
+            } else {
+                html += '<i class="far fa-star"></i>';
+            }
+        }
+        return html;
+    };
+
+    // Renderiza a lista de resenhas na aba
+    const renderReviews = () => {
+        const listContainer = document.getElementById('reviews-list-container');
+        if (!listContainer) return;
+
+        if (!userData || !userData.reviews || userData.reviews.length === 0) {
+            listContainer.innerHTML = `
+                <div class="empty-reviews-state">
+                    <i class="fas fa-comment-slash"></i>
+                    <h3>Sua estante de resenhas está vazia.</h3>
+                    <p>Comece a resenhar seus filmes favoritos clicando em "Escrever Resenha"!</p>
+                </div>
+            `;
+            return;
+        }
+
+        // Ordena por data mais recente
+        const sortedReviews = [...userData.reviews].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+        listContainer.innerHTML = sortedReviews.map(review => {
+            const date = new Date(review.createdAt);
+            const dateStr = date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            const starsHtml = generateStaticStarsHTML(review.rating);
+            
+            return `
+                <div class="review-card" data-id="${review.id}">
+                    <div class="review-card-movie-poster">
+                        <img src="${review.moviePoster}" alt="${review.movieTitle}" onerror="this.src='images/favicon.png'" />
+                    </div>
+                    <div class="review-card-content">
+                        <h3 class="review-card-movie-title">
+                            ${review.movieTitle}
+                        </h3>
+                        <div class="review-card-rating">
+                            <span class="review-card-stars">${starsHtml}</span>
+                            <span class="score-text" style="font-size:0.75rem; margin-left:5px;">${review.rating.toFixed(1)}</span>
+                            <span class="review-card-date">• ${dateStr}</span>
+                        </div>
+                        <h4 class="review-card-title">"${review.reviewTitle}"</h4>
+                        <p class="review-card-body">${review.reviewBody}</p>
+                        <div class="review-card-actions">
+                            <button class="btn-review-action btn-edit-review" onclick="editReview('${review.id}')">
+                                <i class="fas fa-edit"></i> Editar
+                            </button>
+                            <button class="btn-review-action btn-delete-review" onclick="deleteReview('${review.id}')">
+                                <i class="fas fa-trash-alt"></i> Excluir
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    };
+
+    // Renderiza a lista de favoritos na aba Visão Geral
+    const renderFavoritos = () => {
+        const listContainer = document.getElementById('favoritos-list-container');
+        if (!listContainer) return;
+
+        if (!userData || !userData.favoritos || userData.favoritos.length === 0) {
+            listContainer.innerHTML = `
+                <div class="empty-favoritos-state" style="grid-column: 1 / -1; text-align:center; padding:30px 20px; color:#555; background:rgba(255,255,255,0.01); border: 1px dashed #222; border-radius:8px; width: 100%;">
+                    <p style="margin:0; font-size:0.9rem;">Nenhuma produção favoritada ainda. Acesse os detalhes e clique no ❤️!</p>
+                </div>
+            `;
+            return;
+        }
+
+        listContainer.innerHTML = userData.favoritos.map(item => `
+            <div class="favorito-card" style="position:relative; width:120px; flex-shrink:0; transition: transform 0.3s;" onmouseenter="this.style.transform='scale(1.05)'" onmouseleave="this.style.transform='scale(1)'">
+                <a href="detalhes.html?id=${item.id}&type=${item.type}" style="text-decoration:none; display:block;">
+                    <img src="${item.poster}" alt="${item.titulo}" style="width:100%; height:170px; object-fit:cover; border-radius:6px; border:1px solid #282828; box-shadow:0 8px 20px rgba(0,0,0,0.5);" onerror="this.src='images/favicon.png'" />
+                    <h4 style="font-size:0.8rem; color:#fff; margin-top:8px; font-weight:600; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%;">${item.titulo}</h4>
+                </a>
+                <button class="btn-remove-favorito" onclick="removeFavorito('${item.id}')" style="position:absolute; top:-5px; right:-5px; background:#e50914; border:none; color:#fff; border-radius:50%; width:24px; height:24px; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 4px 8px rgba(0,0,0,0.4); transition: transform 0.2s;" onmouseenter="this.style.transform='scale(1.1)'" onmouseleave="this.style.transform='scale(1)'" title="Remover dos Favoritos">
+                    <i class="fas fa-times" style="font-size: 0.75rem;"></i>
+                </button>
+            </div>
+        `).join('');
+    };
+
+    // --- PESQUISA TMDB E SELEÇÃO DE PRODUÇÃO NO MODAL ---
+    const reviewSearchInput = document.getElementById('review-movie-search');
+    const searchDropdown = document.getElementById('search-results-dropdown');
+    let searchTimeout;
+
+    if (reviewSearchInput && searchDropdown) {
+        reviewSearchInput.addEventListener('input', (e) => {
+            clearTimeout(searchTimeout);
+            const query = e.target.value.trim();
+            if (query.length < 2) {
+                searchDropdown.style.display = 'none';
+                return;
+            }
+
+            searchTimeout = setTimeout(async () => {
+                // Busca geral de filmes/séries no TMDB usando pesquisa múltipla
+                const data = await fetchTMDB(`/search/multi?query=${encodeURIComponent(query)}`);
+                if (data && data.results) {
+                    // Filtra apenas resultados válidos de filme ou tv que possuam título ou nome
+                    const items = data.results.filter(item => 
+                        (item.media_type === 'movie' || item.media_type === 'tv') && 
+                        (item.title || item.name)
+                    );
+
+                    if (items.length > 0) {
+                        searchDropdown.innerHTML = items.slice(0, 5).map(item => {
+                            const title = item.title || item.name;
+                            const date = item.release_date || item.first_air_date || '';
+                            const year = date ? date.substring(0, 4) : '????';
+                            const typeTxt = item.media_type === 'movie' ? 'Filme' : 'Série';
+                            const poster = item.poster_path ? `${IMG_BASE}${item.poster_path}` : 'images/favicon.png';
+                            
+                            return `
+                                <div class="search-result-item" 
+                                     data-id="${item.id}" 
+                                     data-title="${title}" 
+                                     data-poster="${poster}" 
+                                     data-type="${item.media_type}" 
+                                     data-year="${year}">
+                                    <img src="${poster}" class="search-result-poster" onerror="this.src='images/favicon.png'" />
+                                    <div class="search-result-info">
+                                        <span class="search-result-title">${title} (${year})</span>
+                                        <span class="search-result-year">${typeTxt}</span>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('');
+                        searchDropdown.style.display = 'block';
+
+                        // Configura clique de seleção para os resultados listados
+                        searchDropdown.querySelectorAll('.search-result-item').forEach(el => {
+                            el.onclick = () => {
+                                const id = el.getAttribute('data-id');
+                                const title = el.getAttribute('data-title');
+                                const poster = el.getAttribute('data-poster');
+                                const type = el.getAttribute('data-type');
+                                const year = el.getAttribute('data-year');
+
+                                selectMovie(id, title, poster, type, year);
+                            };
+                        });
+                    } else {
+                        searchDropdown.innerHTML = `<div style="padding:15px; color:#666; font-size:0.9rem; text-align:center;">Nenhum resultado encontrado</div>`;
+                        searchDropdown.style.display = 'block';
+                    }
+                }
+            }, 300);
+        });
+
+        // Fecha a caixa flutuante ao clicar em qualquer outra parte da página
+        document.addEventListener('click', (e) => {
+            if (!reviewSearchInput.contains(e.target) && !searchDropdown.contains(e.target)) {
+                searchDropdown.style.display = 'none';
+            }
+        });
+    }
+
+    // Define a produção selecionada no formulário de resenha
+    const selectMovie = (id, title, poster, type, year) => {
+        document.getElementById('review-movie-id').value = id;
+        document.getElementById('review-movie-title').value = title;
+        document.getElementById('review-movie-poster').value = poster;
+        document.getElementById('review-movie-type').value = type;
+
+        document.getElementById('selected-movie-poster-img').src = poster;
+        document.getElementById('selected-movie-title-txt').innerText = title;
+        document.getElementById('selected-movie-year').innerText = year || '';
+
+        document.getElementById('movie-search-section').style.display = 'none';
+        document.getElementById('selected-movie-container').style.display = 'flex';
+        
+        if (searchDropdown) searchDropdown.style.display = 'none';
+        if (reviewSearchInput) reviewSearchInput.value = '';
+    };
+
+    // Desmarca a produção selecionada para permitir nova pesquisa
+    const deselectMovie = () => {
+        document.getElementById('review-movie-id').value = '';
+        document.getElementById('review-movie-title').value = '';
+        document.getElementById('review-movie-poster').value = '';
+        document.getElementById('review-movie-type').value = 'movie';
+
+        document.getElementById('movie-search-section').style.display = 'block';
+        document.getElementById('selected-movie-container').style.display = 'none';
+    };
+
+    const btnRemoveSelected = document.getElementById('btn-remove-selected-movie');
+    if (btnRemoveSelected) {
+        btnRemoveSelected.onclick = deselectMovie;
+    }
+
+    // --- ESTRELAS INTERATIVAS (0.5 a 5.0) ---
+    const starsContainer = document.getElementById('star-rating-interactive');
+    const ratingInput = document.getElementById('review-rating-val');
+    const ratingText = document.getElementById('rating-display-value');
+
+    const drawInteractiveStars = (nota) => {
+        if (!starsContainer) return;
+        const stars = starsContainer.querySelectorAll('i');
+        stars.forEach(star => {
+            const index = parseInt(star.getAttribute('data-index'));
+            if (index <= Math.floor(nota)) {
+                star.className = 'fas fa-star';
+            } else if (index === Math.ceil(nota) && nota % 1 !== 0) {
+                star.className = 'fas fa-star-half-alt';
+            } else {
+                star.className = 'far fa-star';
+            }
+        });
+    };
+
+    if (starsContainer) {
+        const stars = starsContainer.querySelectorAll('i');
+        
+        stars.forEach(star => {
+            // Hover: calcula meia estrela com base na posição X do mouse dentro do elemento
+            star.addEventListener('mousemove', (e) => {
+                const index = parseInt(star.getAttribute('data-index'));
+                const rect = star.getBoundingClientRect();
+                const isHalf = (e.clientX - rect.left) < (rect.width / 2);
+                const hoverVal = isHalf ? (index - 0.5) : index;
+                
+                drawInteractiveStars(hoverVal);
+                if (ratingText) ratingText.innerText = `${hoverVal.toFixed(1)} Estrelas`;
+            });
+
+            // Clique: fixa o valor calculado da nota no input e atualiza textos
+            star.addEventListener('click', (e) => {
+                const index = parseInt(star.getAttribute('data-index'));
+                const rect = star.getBoundingClientRect();
+                const isHalf = (e.clientX - rect.left) < (rect.width / 2);
+                const finalVal = isHalf ? (index - 0.5) : index;
+                
+                if (ratingInput) ratingInput.value = finalVal;
+                if (ratingText) ratingText.innerText = `${finalVal.toFixed(1)} Estrelas`;
+                drawInteractiveStars(finalVal);
+            });
+        });
+
+        // Retorno: quando o cursor sai do painel de estrelas, exibe a nota que foi clicada/salva
+        starsContainer.addEventListener('mouseleave', () => {
+            const currentVal = parseFloat(ratingInput ? ratingInput.value : 0);
+            drawInteractiveStars(currentVal);
+            if (ratingText) {
+                ratingText.innerText = currentVal > 0 ? `${currentVal.toFixed(1)} Estrelas` : 'Sem Nota';
+            }
+        });
+    }
+
+    // --- FUNÇÕES GLOBAIS DO CRUD (WINDOW) ---
+
+    // Abertura do formulário preenchido no modo Edição
+    window.editReview = (id) => {
+        const review = userData.reviews.find(r => r.id === id);
+        if (!review) return;
+
+        const modal = document.getElementById('review-modal');
+        if (!modal) return;
+
+        // Define o estado visual para Edição
+        document.getElementById('review-modal-title').innerText = "Editar Resenha";
+        document.getElementById('review-edit-id').value = review.id;
+        
+        // Define e renderiza a produção selecionada
+        selectMovie(review.movieId, review.movieTitle, review.moviePoster, review.movieType || 'movie', '');
+
+        // Preenche a nota selecionada e redesenha as estrelas
+        const ratingVal = parseFloat(review.rating);
+        document.getElementById('review-rating-val').value = ratingVal;
+        if (ratingText) ratingText.innerText = `${ratingVal.toFixed(1)} Estrelas`;
+        drawInteractiveStars(ratingVal);
+
+        // Preenche os textos de título e descrição
+        document.getElementById('review-title').value = review.reviewTitle;
+        document.getElementById('review-body').value = review.reviewBody;
+
+        modal.classList.add('active');
+    };
+
+    // Exclusão definitiva de resenha
+    window.deleteReview = async (id) => {
+        if (!confirm("Deseja realmente remover esta resenha cinéfila definitivamente?")) return;
+
+        userData.reviews = userData.reviews.filter(r => r.id !== id);
+        showToast("Resenha removida com sucesso!", "info");
+        
+        await saveUserDataToCloud();
+        renderReviews();
+        updateStats();
+    };
+
+    // --- CONTROLE DE SUBMIT E FECHAMENTO DO MODAL DE RESENHAS ---
+    const reviewForm = document.getElementById('reviewForm');
+    const reviewModal = document.getElementById('review-modal');
+    
+    // Abre formulário para criação (modo Nova Resenha)
+    const btnOpenReview = document.getElementById('btn-open-review-form');
+    if (btnOpenReview && reviewModal) {
+        btnOpenReview.onclick = () => {
+            document.getElementById('review-modal-title').innerText = "Nova Resenha";
+            document.getElementById('review-edit-id').value = "";
+            
+            // Reseta produção selecionada
+            deselectMovie();
+
+            // Reseta nota e estrelas
+            if (ratingInput) ratingInput.value = "0";
+            if (ratingText) ratingText.innerText = "Sem Nota";
+            drawInteractiveStars(0);
+
+            // Reseta formulário de textos
+            reviewForm.reset();
+
+            reviewModal.classList.add('active');
+        };
+    }
+
+    // Fechar modal
+    const closeReviewModal = () => {
+        if (reviewModal) reviewModal.classList.remove('active');
+    };
+
+    const btnCloseReview = document.getElementById('btn-close-review-modal');
+    const btnCancelReview = document.getElementById('btn-cancel-review');
+
+    if (btnCloseReview) btnCloseReview.onclick = closeReviewModal;
+    if (btnCancelReview) btnCancelReview.onclick = closeReviewModal;
+
+    // Envio do formulário (Criação e Edição no Firestore)
+    if (reviewForm) {
+        reviewForm.onsubmit = async (e) => {
+            e.preventDefault();
+
+            const movieId = document.getElementById('review-movie-id').value;
+            const ratingVal = parseFloat(document.getElementById('review-rating-val').value || 0);
+
+            // Validações básicas de segurança
+            if (!movieId) {
+                return showToast("Por favor, pesquise e selecione um filme/série!", "error");
+            }
+            if (ratingVal <= 0) {
+                return showToast("Por favor, atribua uma nota clicando nas estrelas!", "error");
+            }
+
+            const editId = document.getElementById('review-edit-id').value;
+            const title = document.getElementById('review-title').value.trim();
+            const body = document.getElementById('review-body').value.trim();
+
+            showToast("Salvando resenha...", "info");
+
+            try {
+                if (editId) {
+                    // Modo Edição (Update)
+                    const index = userData.reviews.findIndex(r => r.id === editId);
+                    if (index !== -1) {
+                        userData.reviews[index].rating = ratingVal;
+                        userData.reviews[index].reviewTitle = title;
+                        userData.reviews[index].reviewBody = body;
+                        
+                        // Atualiza a produção caso ela tenha sido trocada
+                        userData.reviews[index].movieId = movieId;
+                        userData.reviews[index].movieTitle = document.getElementById('review-movie-title').value;
+                        userData.reviews[index].moviePoster = document.getElementById('review-movie-poster').value;
+                        userData.reviews[index].movieType = document.getElementById('review-movie-type').value;
+                    }
+                    showToast("Resenha editada com sucesso!", "success");
+                } else {
+                    // Modo Criação (Create)
+                    const reviewObj = {
+                        id: 'review_' + Date.now(),
+                        movieId: movieId,
+                        movieTitle: document.getElementById('review-movie-title').value,
+                        moviePoster: document.getElementById('review-movie-poster').value,
+                        movieType: document.getElementById('review-movie-type').value,
+                        rating: ratingVal,
+                        reviewTitle: title,
+                        reviewBody: body,
+                        createdAt: new Date().toISOString()
+                    };
+
+                    userData.reviews.unshift(reviewObj);
+                    showToast("Resenha publicada com sucesso!", "success");
+                }
+
+                // Salva na nuvem Firebase
+                await saveUserDataToCloud();
+                
+                // Fecha modal e atualiza telas
+                closeReviewModal();
+                updateUI();
+
+            } catch (error) {
+                console.error("Erro ao salvar resenha:", error);
+                showToast("Erro ao processar resenha.", "error");
+            }
+        };
+    }
+
+    // --- LÓGICA ORIGINAL DE UPLOAD DE FOTO, SAIR E MODAL EDITAR PERFIL ---
+    
+    // Upload de Foto
+    const upload = document.getElementById('upload-pic');
+    if (upload) {
+        upload.onchange = (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = async (ev) => {
+                    const base64 = ev.target.result;
+                    // Salva no Firestore e atualiza
+                    userData.profileImage = base64;
+                    await db.collection('users').doc(currentUser.uid).update({
+                        profileImage: base64
+                    });
+                    updateUI();
+                    initHeaderUser();
+                    showToast("Foto de perfil atualizada!", "success");
+                };
+                reader.readAsDataURL(file);
+            }
+        };
+    }
+
+    // Modal de Edição (Apenas Nome)
+    const btnEdit = document.getElementById('btn-edit-profile');
+    const modal = document.getElementById('edit-profile-modal');
+    const btnCancel = document.getElementById('btn-cancel-edit');
+    const formEdit = document.getElementById('editProfileForm');
+
+    if (btnEdit && modal) {
+        btnEdit.onclick = () => {
+            const nomeSalvo = (userData && userData.username) ? userData.username : "";
+            document.getElementById('edit-name').value = nomeSalvo || currentUser.displayName || "";
+            modal.classList.add('active');
+        };
+
+        btnCancel.onclick = () => modal.classList.remove('active');
+
+        formEdit.onsubmit = async (e) => {
+            e.preventDefault();
+            const newName = document.getElementById('edit-name').value.trim();
+
+            if (newName === (userData.username || currentUser.displayName)) {
+                return showToast("Nenhuma alteração detectada.", "info");
+            }
+
+            showToast("Atualizando nome...", "info");
+
+            try {
+                await db.collection('users').doc(currentUser.uid).update({
+                    username: newName
+                });
+                try { await currentUser.updateProfile({ displayName: newName }); } catch (err) { console.log("Google Auth display name sync skipped"); }
+
+                userData.username = newName;
+                updateUI();
+                initHeaderUser();
+                modal.classList.remove('active');
+                showToast("Nome de perfil atualizado!", "success");
+
+            } catch (error) {
+                console.error(error);
+                showToast("Erro ao atualizar nome.", "error");
+            }
+        };
+    }
+
+    // Botão Limpar Histórico do Player
+    const btnClearHistory = document.getElementById('btn-clear-history');
+    if (btnClearHistory) {
+        btnClearHistory.onclick = async () => {
+            if (!currentUser || !userData) return showToast("Faça login para gerenciar dados!", "error");
+            if (!confirm("Deseja realmente limpar todo o seu histórico do player (Continuar Assistindo) definitivamente?")) return;
+            
+            showToast("Limpando histórico...", "info");
+            userData.history = [];
+            
+            try {
+                await saveUserDataToCloud();
+                showToast("Histórico de reprodução limpo!", "success");
+                
+                // Recarrega a aba se ela estiver aberta em alguma tela
+                loadContinueWatching();
+            } catch (err) {
+                console.error("Erro ao salvar limpeza do histórico:", err);
+                showToast("Erro ao sincronizar dados na nuvem.", "error");
+            }
+        };
+    }
+
+    // Botão Sair original
     const btnLogout = document.querySelector('.btn-logout');
     if (btnLogout) {
         btnLogout.onclick = () => {
@@ -1116,81 +1969,44 @@ function initMinhaConta() {
         };
     }
 
-    // Upload de Foto (Opcional, pois Google já traz foto)
-    const upload = document.getElementById('upload-pic');
-    if (upload) upload.onchange = (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = async (ev) => {
-                const base64 = ev.target.result;
-                // Salva no Firestore
-                userData.profileImage = base64;
-                await db.collection('users').doc(currentUser.uid).update({
-                    profileImage: base64
-                });
-                updateUI();
-                initHeaderUser();
-                showToast("Foto atualizada!", "success");
-            };
-            reader.readAsDataURL(file);
+    // --- ATIVAÇÃO AUTOMÁTICA DE MODAL DE RESENHA VIA QUERY PARAM (Kauan - WinBry) ---
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('action') === 'review') {
+        const id = urlParams.get('id');
+        const title = urlParams.get('title');
+        const poster = urlParams.get('poster');
+        const type = urlParams.get('type') || 'movie';
+        const year = urlParams.get('year') || '';
+
+        // Limpa os parâmetros de URL para evitar disparos repetidos no refresh
+        window.history.replaceState({}, document.title, window.location.pathname);
+
+        // 1. Alterna a visualização para a aba de Resenhas no Dashboard
+        const tabResenhasBtn = document.querySelector('.nav-tab-btn[data-tab="tab-reviews"]');
+        if (tabResenhasBtn) {
+            tabResenhasBtn.click(); // Simula o clique para abrir a aba correspondente
         }
-    };
 
-    // --- MODAL: EDITAR PERFIL (APENAS NOME) ---
-    const btnEdit = document.getElementById('btn-edit-profile');
-    const modal = document.getElementById('edit-profile-modal');
-    const btnCancel = document.getElementById('btn-cancel-edit');
-    const formEdit = document.getElementById('editProfileForm');
+        // 2. Abre o modal e pré-seleciona a obra usando selectMovie
+        if (id && title && poster && reviewModal) {
+            document.getElementById('review-modal-title').innerText = "Nova Resenha";
+            document.getElementById('review-edit-id').value = "";
+            
+            // Reseta antes e pré-seleciona o filme desejado
+            deselectMovie();
+            selectMovie(id, title, poster, type, year);
 
-    if (btnEdit && modal) {
-        // ABRIR POP-UP
-        btnEdit.onclick = () => {
-            // Preenche apenas o nome
-            // Removemos o ?. e usamos verificação segura
-            const nomeSalvo = (userData && userData.username) ? userData.username : "";
-            document.getElementById('edit-name').value = nomeSalvo || currentUser.displayName || "";
-            modal.classList.add('active');
-        };
+            // Reseta nota e estrelas
+            if (ratingInput) ratingInput.value = "0";
+            if (ratingText) ratingText.innerText = "Sem Nota";
+            drawInteractiveStars(0);
 
-        // FECHAR POP-UP
-        btnCancel.onclick = () => modal.classList.remove('active');
+            // Reseta formulário de textos
+            reviewForm.reset();
 
-        // SALVAR DADOS
-        formEdit.onsubmit = async (e) => {
-            e.preventDefault();
-
-            const newName = document.getElementById('edit-name').value.trim();
-
-            if (newName === (userData.username || currentUser.displayName)) {
-                return showToast("Nenhuma alteração detectada.", "info");
-            }
-
-            showToast("Atualizando perfil...", "info");
-
-            try {
-                // 1. Atualiza no Banco de Dados
-                await db.collection('users').doc(currentUser.uid).update({
-                    username: newName
-                });
-
-                // 2. Tenta atualizar no Auth do Google (apenas visual local)
-                try { await currentUser.updateProfile({ displayName: newName }); } catch (err) { console.log("Info: Auth profile update skipped"); }
-
-                // 3. Atualização Local
-                userData.username = newName;
-
-                updateUI();
-                initHeaderUser(); // Atualiza o topo do site também
-                modal.classList.remove('active');
-
-                showToast("Nome atualizado com sucesso!", "success");
-
-            } catch (error) {
-                console.error("Erro ao atualizar:", error);
-                showToast("Erro ao salvar alterações.", "error");
-            }
-        };
+            // Abre o modal
+            reviewModal.classList.add('active');
+        }
     }
 }
 
@@ -1238,10 +2054,14 @@ function initSearch() {
         if (input.value) {
             const path = window.location.pathname;
             let targetPage = 'filmes.html';
+            let extra = '';
             if (path.includes('series')) targetPage = 'series.html';
             else if (path.includes('animes')) targetPage = 'animes.html';
+            else {
+                extra = '&multi=true';
+            }
 
-            window.location.href = `${targetPage}?search=${encodeURIComponent(input.value)}`;
+            window.location.href = `${targetPage}?search=${encodeURIComponent(input.value)}${extra}`;
         }
     };
 
@@ -1276,7 +2096,6 @@ function initVideoModal() {
     const close = document.getElementById('close-player');
     const iframe = document.getElementById('video-iframe');
     if (close) close.onclick = () => { modal.classList.remove('show'); iframe.src = ''; };
-    if (modal) modal.onclick = (e) => { if (e.target === modal) { modal.classList.remove('show'); iframe.src = ''; } };
 }
 function initTheme() {
     const toggle = document.getElementById('theme-toggle');
@@ -1303,10 +2122,9 @@ function setupSaveProgress(itemData) {
         serieInputs.style.display = (itemData.type === 'tv') ? 'flex' : 'none';
     }
 
-    // Tenta preencher os inputs se já tiver progresso salvo antes
-    const user = getActiveUser();
-    if (user && user.history) {
-        const saved = user.history.find(h => String(h.id) === String(itemData.id));
+    // Tenta preencher os inputs se já tiver progresso salvo antes no Firestore
+    if (userData && userData.history) {
+        const saved = userData.history.find(h => String(h.id) === String(itemData.id));
         if (saved) {
             document.getElementById('stop-hour').value = saved.progress.h || 0;
             document.getElementById('stop-min').value = saved.progress.m || 0;
@@ -1314,6 +2132,20 @@ function setupSaveProgress(itemData) {
                 document.getElementById('current-season').value = saved.progress.s || 1;
                 document.getElementById('current-episode').value = saved.progress.ep || 1;
             }
+        } else {
+            document.getElementById('stop-hour').value = '';
+            document.getElementById('stop-min').value = '';
+            if (itemData.type === 'tv') {
+                document.getElementById('current-season').value = 1;
+                document.getElementById('current-episode').value = 1;
+            }
+        }
+    } else {
+        document.getElementById('stop-hour').value = '';
+        document.getElementById('stop-min').value = '';
+        if (itemData.type === 'tv') {
+            document.getElementById('current-season').value = 1;
+            document.getElementById('current-episode').value = 1;
         }
     }
 }
@@ -1340,39 +2172,68 @@ function toggleMinhaLista(item, btn) {
 
 function updateListaButton(btn, id) {
     if (!userData || !btn) return;
-    // Verifica se a lista existe antes de rodar o .some()
     const exists = (userData.minhaLista && userData.minhaLista.some(i => String(i.id) === String(id)));
     if (exists) {
         btn.innerHTML = '<i class="fas fa-check"></i> Na Lista';
         btn.classList.add('active');
-        btn.style.backgroundColor = '#4CAF50';
+        btn.style.backgroundColor = '#2ecc71';
+        btn.style.borderColor = '#2ecc71';
+        btn.style.boxShadow = '0 0 15px rgba(46, 204, 113, 0.4)';
+        btn.style.color = '#ffffff';
     } else {
         btn.innerHTML = '<i class="fas fa-bookmark"></i> Minha Lista';
         btn.classList.remove('active');
-        btn.style.backgroundColor = '';
+        btn.style.backgroundColor = 'rgba(255, 255, 255, 0.08)';
+        btn.style.borderColor = 'rgba(255, 140, 0, 0.4)';
+        btn.style.boxShadow = '0 0 10px rgba(255, 140, 0, 0.15)';
+        btn.style.color = '#ffffff';
     }
 }
+
 
 function initMinhaListaPage() {
     const container = document.getElementById('lista-container');
     if (!container) return;
 
-    if (!userData || !userData.minhaLista || !userData.minhaLista.length) {
-        container.innerHTML = `<div class="empty-state">
-            <i class="fas fa-film" style="font-size: 3rem; margin-bottom: 20px; color: #333;"></i>
-            <h3>Sua lista está vazia.</h3>
-        </div>`;
-        return;
-    }
+    // Se o Firebase concluiu a autenticação e os dados do Firestore estão carregados
+    if (currentUser && userData) {
+        if (!userData.minhaLista || !userData.minhaLista.length) {
+            container.innerHTML = `<div class="empty-state" style="grid-column: 1 / -1; text-align: center; padding: 60px 20px;">
+                <i class="fas fa-film" style="font-size: 3rem; margin-bottom: 20px; color: #555;"></i>
+                <h3 style="font-size: 1.3rem; color: #aaa; font-weight: 500;">Sua lista está vazia.</h3>
+                <p style="color: #666; font-size: 0.9rem; margin-top: 10px;">Adicione filmes e séries clicando no botão "Minha Lista" na página de detalhes!</p>
+            </div>`;
+            return;
+        }
 
-    container.innerHTML = userData.minhaLista.map(item => `
-    <div class="content-card-wrapper">
-        <a href="detalhes.html?id=${item.id}&type=${item.type}" class="content-card">
-            <img src="${item.poster}" loading="lazy">
-            <div class="card-info"><h3>${item.titulo}</h3></div>
-        </a>
-        <button onclick="removeItemLista('${item.id}')" class="btn-remove-lista"><i class="fas fa-trash"></i> Remover</button>
-    </div>`).join('');
+        container.innerHTML = userData.minhaLista.map(item => `
+        <div class="content-card-wrapper" style="animation: fadeInUp 0.4s ease-out;">
+            <a href="detalhes.html?id=${item.id}&type=${item.type}" class="content-card">
+                <img src="${item.poster}" loading="lazy" onerror="this.src='images/favicon.png'">
+                <div class="card-info"><h3>${item.titulo}</h3></div>
+            </a>
+            <button onclick="removeItemLista('${item.id}')" class="btn-remove-lista" title="Remover da Lista"><i class="fas fa-trash"></i> Remover</button>
+        </div>`).join('');
+    } 
+    // Se a autenticação foi resolvida mas não há usuário conectado (deslogado)
+    else if (window.isAuthResolved && !currentUser) {
+        container.innerHTML = `<div class="empty-state" style="grid-column: 1 / -1; text-align: center; padding: 60px 20px;">
+            <i class="fas fa-sign-in-alt" style="font-size: 3rem; margin-bottom: 20px; color: #e50914;"></i>
+            <h3 style="font-size: 1.3rem; color: #aaa; font-weight: 500;">Você precisa fazer login para acessar sua lista.</h3>
+            <a href="login.html" class="btn btn-primary" style="margin-top: 20px; display: inline-flex; align-items: center; gap: 8px;">
+                <i class="fas fa-user"></i> Entrar
+            </a>
+        </div>`;
+    } 
+    // Se ainda está autenticando ou carregando dados da nuvem (Firestore)
+    else {
+        container.innerHTML = `<div class="empty-state" style="grid-column: 1 / -1; text-align: center; padding: 80px 20px;">
+            <i class="fas fa-spinner fa-spin" style="font-size: 3rem; margin-bottom: 20px; color: #e50914;"></i>
+            <h3 style="font-size: 1.3rem; color: #aaa; font-weight: 500;">Buscando sua lista na nuvem...</h3>
+        </div>`;
+        // Tenta renderizar novamente em 200ms assim que os dados estiverem disponíveis
+        setTimeout(initMinhaListaPage, 200);
+    }
 }
 
 window.removeItemLista = function (id) {
@@ -1380,7 +2241,88 @@ window.removeItemLista = function (id) {
     userData.minhaLista = userData.minhaLista.filter(i => String(i.id) !== String(id));
     saveUserDataToCloud();
     initMinhaListaPage();
-    showToast("Item removido.", "info");
+    showToast("Item removido da lista.", "info");
+
+    // Sincroniza dinamicamente a contagem no Dashboard de perfil
+    const statWatchlist = document.getElementById('stat-watchlist-count');
+    if (statWatchlist) statWatchlist.innerText = userData.minhaLista.length;
+};
+
+function toggleFavorito(item, btn) {
+    if (!currentUser || !userData) return showToast("Faça login para favoritar!", "error");
+
+    if (!userData.favoritos) userData.favoritos = [];
+    const list = userData.favoritos;
+    const exists = list.find(i => String(i.id) === String(item.id));
+
+    if (exists) {
+        userData.favoritos = list.filter(i => String(i.id) !== String(item.id));
+        showToast("Removido dos Favoritos", "info");
+    } else {
+        userData.favoritos.push(item);
+        showToast("Adicionado aos Favoritos", "success");
+    }
+
+    updateFavoritoButton(btn, item.id);
+    saveUserDataToCloud();
+}
+
+function updateFavoritoButton(btn, id) {
+    if (!userData || !btn) return;
+    const exists = (userData.favoritos && userData.favoritos.some(i => String(i.id) === String(id)));
+    if (exists) {
+        btn.innerHTML = '<i class="fas fa-heart"></i> Favoritado';
+        btn.classList.add('active');
+        btn.style.backgroundColor = '#ff2a3b';
+        btn.style.borderColor = '#ff2a3b';
+        btn.style.boxShadow = '0 0 15px rgba(255, 42, 59, 0.5)';
+        btn.style.color = '#ffffff';
+    } else {
+        btn.innerHTML = '<i class="far fa-heart"></i> Favoritar';
+        btn.classList.remove('active');
+        btn.style.backgroundColor = 'rgba(255, 255, 255, 0.08)';
+        btn.style.borderColor = 'rgba(255, 42, 59, 0.4)';
+        btn.style.boxShadow = '0 0 10px rgba(255, 42, 59, 0.15)';
+        btn.style.color = '#ffffff';
+    }
+}
+
+window.removeFavorito = async (id) => {
+    if (!userData) return;
+    userData.favoritos = userData.favoritos.filter(i => String(i.id) !== String(id));
+    await saveUserDataToCloud();
+    showToast("Favorito removido.", "info");
+    
+    // Atualiza estatísticas do dashboard e favoritos se estiver em minha-conta.html
+    const statFavorites = document.getElementById('stat-favorites-count');
+    if (statFavorites) statFavorites.innerText = userData.favoritos.length;
+    
+    // Dispara a renderização dos favoritos dinamicamente
+    const listContainer = document.getElementById('favoritos-list-container');
+    if (listContainer) {
+        // Se a função renderFavoritos existir (ela é local do escopo initMinhaConta), mas podemos disparar atualizando a UI
+        // Para que funcione de forma limpa, criamos um CustomEvent ou podemos simplesmente fazer uma busca e recarregar
+        // Como o removeFavorito é global (window.removeFavorito), o melhor é disparar um evento customizado ou fazer a renderização direta.
+        // Espere! A função renderFavoritos() é exposta ou local?
+        // Ela é local no initMinhaConta(). Mas no removeFavorito, podemos simplesmente achar e deletar o card .favorito-card da DOM!
+        // Sim! Remover o card diretamente do DOM é super limpo, rápido e não precisa recarregar nada!
+        const cardBtn = listContainer.querySelector('.favorito-card button[onclick*="' + id + '"]');
+        const card = cardBtn ? cardBtn.closest('.favorito-card') : null;
+        if (card) {
+            card.style.transform = 'scale(0)';
+            card.style.transition = 'transform 0.3s ease-out';
+            setTimeout(() => {
+                card.remove();
+                if (userData.favoritos.length === 0) {
+                    listContainer.innerHTML = `
+                        <div class="empty-favoritos-state" style="grid-column: 1 / -1; text-align:center; padding:30px 20px; color:#555; background:rgba(255,255,255,0.01); border: 1px dashed #222; border-radius:8px; width: 100%;">
+                            <p style="margin:0; font-size:0.9rem;">Nenhuma produção favoritada ainda. Acesse os detalhes e clique no ❤️!</p>
+                        </div>
+                    `;
+                }
+            }, 300);
+        }
+    }
 };
 
 function initSaveButton() {
@@ -1413,18 +2355,41 @@ function loadContinueWatching() {
         return;
     }
     section.style.display = 'block';
-    section.querySelector('.container').innerHTML = `<h2>Continuar Assistindo (${userData.username})</h2>
-    <div class="carousel-wrapper"><div class="carousel">${userData.history.map(item => `
+    
+    const container = section.querySelector('.container');
+    if (!container) return;
+
+    container.innerHTML = `<h2>Continuar Assistindo</h2>`;
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'carousel-wrapper';
+
+    const carousel = document.createElement('div');
+    carousel.className = 'carousel';
+    
+    carousel.innerHTML = userData.history.map(item => {
+        const h = parseInt(item.progress.h) || 0;
+        const m = parseInt(item.progress.m) || 0;
+        const progMin = (h * 60) + m;
+        const duracaoEstimada = item.type === 'tv' ? 45 : 120;
+        let pct = Math.min(Math.max(Math.round((progMin / duracaoEstimada) * 100), 15), 90);
+        
+        return `
         <div class="history-item-wrapper">
-            <button onclick="removeFromHistory('${item.id}')" class="btn-remove-history"><i class="fas fa-times"></i></button>
-            <a href="detalhes.html?id=${item.id}&type=${item.type}" class="content-card">
+            <button onclick="removeFromHistory('${item.id}')" class="btn-remove-history" title="Remover do histórico"><i class="fas fa-times"></i></button>
+            <a href="detalhes.html?id=${item.id}&type=${item.type}" class="content-card history-card">
                 <img src="${item.poster}" loading="lazy">
-                <div style="position:absolute;bottom:0;background:rgba(0,0,0,0.8);width:100%;padding:5px;font-size:0.8rem;color:#ccc;">
-                    ${item.type === 'tv' ? `T${item.progress.s}:E${item.progress.ep}` : ''} ${item.progress.h}h ${item.progress.m}m
+                <div class="history-progress-overlay">
+                    <span class="history-time-info">
+                        ${item.type === 'tv' ? `T${item.progress.s} EP${item.progress.ep} • ` : ''}${h > 0 ? `${h}h ` : ''}${m}m
+                    </span>
+                    <div class="history-progress-track">
+                        <div class="history-progress-bar" style="width: ${pct}%;"></div>
+                    </div>
                 </div>
             </a>
-        </div>`).join('')
-        }</div></div>`;
+        </div>`;
+    }).join('');
 
     // Botões do Carrossel (Padrão)
     const prev = document.createElement('button');
@@ -1446,27 +2411,6 @@ window.removeFromHistory = function (id) {
     userData.history = userData.history.filter(i => String(i.id) !== String(id));
     saveUserDataToCloud();
     loadContinueWatching();
-    showToast("Removido.", "info");
-};
-
-// --- NOVA FUNÇÃO: Remover item específico ---
-window.removeFromHistory = function (id) {
-    // 1. Pega usuário
-    const user = getActiveUser();
-    if (!user || !user.history) return;
-
-    // 2. Filtra o histórico removendo o item com o ID passado
-    // Usamos String() para garantir que comparação de número/texto funcione
-    user.history = user.history.filter(item => String(item.id) !== String(id));
-
-    // 3. Salva no LocalStorage
-    updateActiveUser(user);
-
-    // 4. Recarrega a seção visualmente
-    // Se a lista ficar vazia, a própria função loadContinueWatching vai esconder a aba (display: none)
-    loadContinueWatching();
-
-    // 5. Feedback visual
     showToast("Removido do histórico.", "info");
 };
 
@@ -1621,12 +2565,19 @@ window.playHeroMovie = function (id, type) {
 const System = {
     saveKey(key) {
         if (!key || key.trim() === "") return false;
-        localStorage.setItem('winbry_gemini_key', key.trim());
+        // Sanitiza aspas simples, duplas e espaços extras colados
+        const cleanKey = key.trim().replace(/^["']|["']$/g, '').trim();
+        localStorage.setItem('winbry_gemini_key', cleanKey);
         return true;
     },
 
     getKey() {
-        return localStorage.getItem('winbry_gemini_key');
+        let key = localStorage.getItem('winbry_gemini_key');
+        if (key) {
+            // Sanitiza aspas simples, duplas e espaços extras recuperados
+            key = key.trim().replace(/^["']|["']$/g, '').trim();
+        }
+        return key || 'AIzaSyBWfVHxvx0sAZLsHcOPvmtPVqE6PYhdIh4';
     },
 
     initSettings() {
@@ -1656,18 +2607,24 @@ const BryIA = {
     // Guarda: { role: 'user'|'bot', type: 'text'|'card', text: string, data: object, timestamp: number }
     chatHistory: [],
 
-    elements: {
-        fab: document.getElementById('bryia-fab'),
-        window: document.getElementById('bryia-window'),
-        close: document.getElementById('close-bryia'),
-        send: document.getElementById('bryia-send'),
-        input: document.getElementById('bryia-input'),
-        msgs: document.getElementById('bryia-messages'),
-        header: document.querySelector('.bryia-header')
-    },
+    elements: {},
 
     init() {
-        if (!this.elements.fab) return;
+        // Resolve os elementos dinamicamente para garantir que não estejam nulos após o carregamento do DOM
+        this.elements = {
+            fab: document.getElementById('bryia-fab'),
+            window: document.getElementById('bryia-window'),
+            close: document.getElementById('close-bryia'),
+            send: document.getElementById('bryia-send'),
+            input: document.getElementById('bryia-input'),
+            msgs: document.getElementById('bryia-messages'),
+            header: document.querySelector('.bryia-header')
+        };
+
+        if (!this.elements.fab) {
+            console.log("BryIA: Elemento 'bryia-fab' não encontrado nesta página. Chat não inicializado.");
+            return;
+        }
 
         // 1. Carrega histórico salvo
         this.loadLocalHistory();
@@ -1690,9 +2647,11 @@ const BryIA = {
             clearBtn.onclick = () => this.confirmDeleteUI();
 
             const closeBtn = this.elements.close;
-            closeBtn.parentNode.insertBefore(actionsContainer, closeBtn);
-            actionsContainer.appendChild(clearBtn);
-            actionsContainer.appendChild(closeBtn);
+            if (closeBtn && closeBtn.parentNode) {
+                closeBtn.parentNode.insertBefore(actionsContainer, closeBtn);
+                actionsContainer.appendChild(clearBtn);
+                actionsContainer.appendChild(closeBtn);
+            }
         }
 
         this.elements.fab.onclick = () => {
@@ -1700,20 +2659,27 @@ const BryIA = {
             setTimeout(() => this.scrollToBottom(), 100);
         };
         if (this.elements.close) this.elements.close.onclick = () => this.elements.window.classList.remove('active');
-        this.elements.send.onclick = () => this.sendMessage();
-        this.elements.input.onkeypress = (e) => { if (e.key === 'Enter') this.sendMessage(); };
+        if (this.elements.send) this.elements.send.onclick = () => this.sendMessage();
+        if (this.elements.input) {
+            this.elements.input.onkeypress = (e) => { if (e.key === 'Enter') this.sendMessage(); };
+        }
     },
 
     loadLocalHistory() {
-        const saved = localStorage.getItem('bryia_chat_history');
+        const key = (typeof currentUser !== 'undefined' && currentUser) ? `bryia_chat_history_${currentUser.uid}` : 'bryia_chat_history_guest';
+        const saved = localStorage.getItem(key);
         if (saved) {
             this.chatHistory = JSON.parse(saved);
             this.renderFullHistory();
+        } else {
+            this.chatHistory = [];
+            this.elements.msgs.innerHTML = '';
         }
     },
 
     saveLocalHistory() {
-        localStorage.setItem('bryia_chat_history', JSON.stringify(this.chatHistory));
+        const key = (typeof currentUser !== 'undefined' && currentUser) ? `bryia_chat_history_${currentUser.uid}` : 'bryia_chat_history_guest';
+        localStorage.setItem(key, JSON.stringify(this.chatHistory));
     },
 
     renderFullHistory() {
@@ -1778,7 +2744,8 @@ const BryIA = {
 
         btnConfirm.onclick = () => {
             this.chatHistory = [];
-            localStorage.removeItem('bryia_chat_history');
+            const key = (typeof currentUser !== 'undefined' && currentUser) ? `bryia_chat_history_${currentUser.uid}` : 'bryia_chat_history_guest';
+            localStorage.removeItem(key);
             this.elements.msgs.innerHTML = `<div class="message bot"><div class="msg-text">Histórico limpo! Tudo pronto. 🎬🍿</div></div>`;
             overlay.remove();
         };
@@ -1836,9 +2803,11 @@ const BryIA = {
             const errString = error.message.toLowerCase();
 
             if (errString.includes('quota') || errString.includes('429') || errString.includes('limit')) {
-                friendlyError = `🚦 <b>Limite Gratuito Atingido</b><br><br>Muita gente falando comigo! ⏳ <b>Aguarde 30 segundos</b> e tente de novo.`;
+                friendlyError = `🚦 <b>Limite de Requisições</b><br><br>Sua chave atingiu o limite por minuto. ⏳ Aguarde alguns segundos e tente novamente. Se persistir, verifique os limites da sua API Key no <a href='https://aistudio.google.com' target='_blank' style='color:#ff6666'>AI Studio</a>.<br><br><small style="opacity: 0.65; font-size: 0.72rem; display: block; border-top: 1px dashed rgba(255,255,255,0.15); padding-top: 6px; margin-top: 4px; font-family: monospace; word-break: break-word;"><b>Erro do Servidor:</b> ${error.message}</small>`;
             } else if (errString.includes('key')) {
-                friendlyError = "🔑 <b>Chave Inválida:</b> Verifique sua API Key.";
+                friendlyError = `🔑 <b>Chave Inválida:</b> Verifique sua API Key.<br><br><small style="opacity: 0.65; font-size: 0.72rem; display: block; border-top: 1px dashed rgba(255,255,255,0.15); padding-top: 6px; margin-top: 4px; font-family: monospace; word-break: break-word;"><b>Erro do Servidor:</b> ${error.message}</small>`;
+            } else {
+                friendlyError = `❌ <b>Erro na Comunicação</b><br><br>Não foi possível obter resposta da BryIA.<br><br><small style="opacity: 0.65; font-size: 0.72rem; display: block; border-top: 1px dashed rgba(255,255,255,0.15); padding-top: 6px; margin-top: 4px; font-family: monospace; word-break: break-word;"><b>Erro do Servidor:</b> ${error.message}</small>`;
             }
 
             this.appendMsg(friendlyError, 'bot', false);
@@ -1846,7 +2815,7 @@ const BryIA = {
     },
 
     async callGemini(key) {
-        const modelName = "gemini-2.5-flash";
+        const modelName = "gemini-flash-latest";
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`;
 
         let contextoPagina = "";
@@ -1856,29 +2825,40 @@ const BryIA = {
 
         const historyForGemini = this.chatHistory
             .filter(msg => msg.type !== 'card')
+            .slice(-12)
             .map(msg => ({
                 role: msg.role === 'bot' ? 'model' : 'user',
                 parts: [{ text: msg.text }]
             }));
 
-        // --- AQUI ESTÁ A MÁGICA DO PROMPT ---
+        // --- INJEÇÃO INVISÍVEL À PROVA DE FALHAS (CORREÇÃO DE TAGS E RECOMENDAÇÕES) ---
+        if (historyForGemini.length > 0 && historyForGemini[historyForGemini.length - 1].role === 'user') {
+            const lastMsg = historyForGemini[historyForGemini.length - 1];
+            lastMsg.parts[0].text = `[INSTRUÇÃO CRÍTICA DE SISTEMA (BRYIA 2026): Você DEVE obrigatoriamente retornar as indicações/sugestões de filmes, séries ou animes utilizando a tag especial '[BUSCA:Nome exato da Obra Ano]' para cada obra listada (ex: [BUSCA:Meu Amigo Totoro 1988], [BUSCA:Titanic 1997]). NUNCA liste nomes de obras em texto comum ou sem a tag [BUSCA:...]. Escreva uma introdução simpática e use a frase exata "Aqui está:" ou "Aqui estão algumas opções incríveis:".]\n\nPergunta do Usuário: ${lastMsg.parts[0].text}`;
+        }
+
         const systemInstruction = `
-        Você é a BryIA, assistente do WinBry+. 🎬✨
+        Você é a BryIA, assistente cinéfila oficial do WinBry. 🎬✨
         
-        SUA MISSÃO:
-        - Seja carismática e use emojis (🍿, 📽️, ✨).
-        - Seja BREVE (máximo 2 ou 3 frases).
+        SUA MISSÃO & REGRAS TEMPORAIS (VITAL):
+        - Você está rodando no ano de 2026. Você tem conhecimento integral de todas as produções de cinema, streaming, séries e animes lançados até o ano atual de 2026, bem como anúncios, produções em andamento e datas de lançamentos futuros previstas para 2026, 2027 e anos seguintes. Nunca diga que seu conhecimento é limitado a 2023 ou 2024. Você sabe de tudo sobre a atualidade do cinema de 2026!
+        - Seja carismática, utilize emojis (🍿, 📽️, ✨) e seja direta e prestativa.
         
-        ⚠️ REGRA CRÍTICA PARA FILMES ANTIGOS OU REMAKES:
-        - Se o filme tiver versões diferentes (ex: Resident Evil, King Kong), você DEVE colocar o ANO na busca.
-        - Formato Obrigatório: [BUSCA:Nome do Filme ANO].
+        ⚠️ REGRAS DE OURO PARA INDICAÇÕES E LISTAS (CRÍTICO):
+        - Quando o usuário pedir listas, sugestões, indicações de obras ou filmes por estúdio/gênero/tema (ex: "filmes do studio ghibli", "filme de terror da galáxia", "top 5 ação", etc.):
+          1. Comece SEMPRE a resposta com uma introdução simpática e direta que use a frase exata "Aqui está:" ou "Aqui estão algumas opções incríveis:" (ou variações muito próximas como "Aqui estão as melhores opções:").
+          2. Liste as obras logo abaixo. Para cada obra listada, você DEVE obrigatoriamente usar o formato de tag especial [BUSCA:Nome da Obra Ano].
+          3. NUNCA, SOB NENHUMA HIPÓTESE, liste o nome de um filme/série/anime em formato de texto comum (ex: sem a tag). Toda menção a obras deve conter a tag [BUSCA:Nome da Obra Ano] para que nossa interface capture o nome e monte automaticamente os cards enriquecidos com capas e botões de assistir. Se você não colocar a tag, os cards não aparecerão na tela!
         
-        Exemplos:
-        - Usuário: "Primeiro Resident Evil" -> Resposta: "Aqui está o clássico! [BUSCA:Resident Evil 2002]"
-        - Usuário: "King Kong antigo" -> Resposta: "O original! [BUSCA:King Kong 1933]"
+        ⚠️ REGRA CRÍTICA E ABSOLUTAMENTE OBRIGATÓRIA DA TAG [BUSCA]:
+        - Sempre que você citar, indicar, recomendar, sugerir ou fizer menção a QUALQUER filme, série, anime ou obra de ficção, você DEVE obrigatoriamente anexar a tag especial [BUSCA:Nome exato da Obra ANO] imediatamente após ou no lugar do nome da obra.
+        - O nome na tag deve ser o nome oficial da produção em português (ou como é conhecida no Brasil) e o ano deve ser o ano de lançamento original dela (ex: 2001, 1988, 2026).
         
-        Se não colocar o ano, o sistema pode pegar o filme errado.
-        Contexto: ${contextoPagina}
+        Exemplos de formato obrigatório:
+        - Usuário: "filmes de terror da galáxia" -> Resposta: "Aqui estão excelentes opções de terror no espaço para você se arrepiar! 🌌🛸🍿\n1. [BUSCA:Alien, o Oitavo Passageiro 1979] - O clássico absoluto do terror espacial.\n2. [BUSCA:O Enigma do Horizonte 1997] - Uma viagem perturbadora rumo ao inferno na galáxia.\n3. [BUSCA:Pandorum 2009] - Sobrevivência e loucura a bordo de uma espaçonave gigante."
+        - Usuário: "Qual o top 3 do Ghibli?" -> Resposta: "O Studio Ghibli é maravilhoso! 🌌✨ Aqui estão as 3 maiores obras-primas:\n1. [BUSCA:A Viagem de Chihiro 2001] - Uma fantástica jornada espiritual.\n2. [BUSCA:Meu Amigo Totoro 1988] - Um clássico doce e poético.\n3. [BUSCA:O Castelo Animado 2004] - Uma magia deslumbrante."
+        
+        Contexto atual da página: ${contextoPagina}
         `;
 
         const payload = {
@@ -1893,27 +2873,48 @@ const BryIA = {
         });
 
         const data = await response.json();
-        if (!response.ok) throw new Error((data.error && data.error.message) ? data.error.message : "Erro API");
-        if (!data.candidates || !data.candidates[0].content) throw new Error("Sem resposta.");
+
+        if (response.status === 429) {
+            throw new Error("Quota exceeded (429)");
+        }
+
+        if (!response.ok) {
+            throw new Error((data.error && data.error.message) ? data.error.message : `Erro API: ${response.status}`);
+        }
+
+        if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
+            const blockReason = (data.promptFeedback && data.promptFeedback.blockReason) ? data.promptFeedback.blockReason : null;
+            throw new Error(blockReason ? `Bloqueado: ${blockReason}` : "Sem resposta do modelo.");
+        }
 
         return data.candidates[0].content.parts[0].text;
     },
 
+
     async processResponse(text) {
         const searchRegex = /\[BUSCA:(.*?)\]/g;
         let formattedText = text.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(searchRegex, "<b>$1</b>");
-        this.appendMsg(formattedText, 'bot', true);
+        
+        // Cria a mensagem de texto da IA e captura a div correspondente
+        const messageEl = this.appendMsg(formattedText, 'bot', true);
 
         searchRegex.lastIndex = 0;
         let match;
+        const promessas = [];
         while ((match = searchRegex.exec(text)) !== null) {
             const termo = match[1].trim();
-            if (termo) await this.searchAndCreateCard(termo, true);
+            if (termo) {
+                // Passa a div da mensagem para que o card seja acoplado dentro dela
+                promessas.push(this.searchAndCreateCard(termo, true, messageEl));
+            }
+        }
+        if (promessas.length > 0) {
+            await Promise.all(promessas);
         }
     },
 
     // --- CORREÇÃO TÉCNICA: FILTRO DE ANO ---
-    async searchAndCreateCard(query, shouldSave = false) {
+    async searchAndCreateCard(query, shouldSave = false, targetMessageElement = null) {
         try {
             // 1. Tenta extrair um ano da busca (ex: "Resident Evil 2002")
             // Regex procura por 4 dígitos no final da string
@@ -1930,7 +2931,7 @@ const BryIA = {
 
             const data = await fetchTMDB(`/search/multi?query=${encodeURIComponent(searchTerm)}&include_adult=false&language=pt-BR`);
 
-            if (data?.results?.length > 0) {
+            if (data && data.results && data.results.length > 0) {
                 let bestMatch = null;
 
                 // 2. Se temos um ano alvo, filtramos os resultados
@@ -1947,33 +2948,68 @@ const BryIA = {
                     bestMatch = data.results.find(i => (i.media_type === 'movie' || i.media_type === 'tv') && i.poster_path);
                 }
 
-                if (bestMatch) this.createCardHtml(bestMatch, shouldSave);
+                // 4. Fallback tolerante se ainda não achou nada com poster
+                if (!bestMatch) {
+                    bestMatch = data.results.find(i => i.poster_path);
+                }
+
+                // 5. Fallback final: pega o primeiro resultado da busca geral
+                if (!bestMatch && data.results.length > 0) {
+                    bestMatch = data.results[0];
+                }
+
+                if (bestMatch) this.createCardHtml(bestMatch, shouldSave, targetMessageElement);
             }
         } catch (e) { console.error(e); }
     },
 
-    createCardHtml(item, shouldSave) {
-        const div = document.createElement('div');
-        div.className = 'message bot';
-        div.style.cssText = "background:transparent; padding:0; margin-top:5px; max-width:90%;";
+    createCardHtml(item, shouldSave, targetMessageElement = null) {
+        let container = targetMessageElement;
+
+        // Se não foi fornecido um elemento alvo (ex: ao renderizar o histórico),
+        // busca o último balão bot ativo de texto
+        if (!container) {
+            const botMessages = this.elements.msgs.querySelectorAll('.message.bot');
+            if (botMessages.length > 0) {
+                container = botMessages[botMessages.length - 1];
+            }
+        }
 
         const poster = item.poster_path ? `${IMG_BASE}${item.poster_path}` : 'images/favicon.png';
         const title = item.title || item.name;
         const year = (item.release_date || item.first_air_date || '????').substring(0, 4);
         const type = item.media_type || 'movie';
 
-        div.innerHTML = `
-            <div class="bryia-card" style="display:flex; gap:12px; background:#1f1f1f; padding:10px; border-radius:10px; border:1px solid #333; align-items:center; box-shadow:0 4px 10px rgba(0,0,0,0.3); transition: transform 0.2s;">
-                <img src="${poster}" style="width:55px; height:80px; object-fit:cover; border-radius:6px;" onerror="this.src='images/favicon.png'">
-                <div class="bryia-card-info" style="display:flex; flex-direction:column; gap:4px; flex:1;">
-                    <h4 style="margin:0; color:white; font-size:0.95rem; font-weight:600; line-height:1.2;">${title} <small style="color:#aaa;">(${year})</small></h4>
-                    <a href="detalhes.html?id=${item.id}&type=${type}" class="btn-play-mini" style="background:var(--color-primary); color:white; text-decoration:none; padding:6px 14px; border-radius:4px; font-size:0.8rem; text-align:center; width:fit-content; display:inline-flex; align-items:center; gap:6px; font-weight:bold; margin-top:5px;">
+        const cardHtml = `
+            <div class="bryia-card">
+                <img src="${poster}" onerror="this.src='images/favicon.png'">
+                <div class="bryia-card-info">
+                    <h4>${title} <small>(${year})</small></h4>
+                    <a href="detalhes.html?id=${item.id}&type=${type}" class="btn-play-mini">
                         <i class="fas fa-play"></i> Assistir
                     </a>
                 </div>
             </div>`;
 
-        this.elements.msgs.appendChild(div);
+        if (container) {
+            // Verifica se a div do container de cards já existe na mensagem bot
+            let cardsContainer = container.querySelector('.bryia-cards-container');
+            if (!cardsContainer) {
+                cardsContainer = document.createElement('div');
+                cardsContainer.className = 'bryia-cards-container';
+                cardsContainer.style.cssText = "display: flex; flex-direction: column; gap: 10px; margin-top: 10px; width: 100%;";
+                container.appendChild(cardsContainer);
+            }
+            cardsContainer.insertAdjacentHTML('beforeend', cardHtml);
+        } else {
+            // Fallback se não encontrar nenhuma mensagem bot (segurança)
+            const div = document.createElement('div');
+            div.className = 'message bot';
+            div.style.cssText = "background:transparent; padding:0; margin-top:5px; max-width:90%;";
+            div.innerHTML = `<div class="bryia-cards-container" style="display: flex; flex-direction: column; gap: 10px; width: 100%;">${cardHtml}</div>`;
+            this.elements.msgs.appendChild(div);
+        }
+
         this.scrollToBottom();
 
         if (shouldSave) {
@@ -1999,7 +3035,7 @@ const BryIA = {
             this.saveLocalHistory();
         }
 
-        return isLoading ? 'loading-msg' : null;
+        return isLoading ? 'loading-msg' : div;
     },
 
     scrollToBottom() {
@@ -2034,7 +3070,7 @@ async function surpreendaMe() {
 //  INICIALIZADOR MESTRE (LIGA TUDO NO FINAL)
 // =================================================================
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("WinBry+ Mestre Iniciado 🚀");
+    console.log("WinBry Mestre Iniciado 🚀");
 
     // 1. Inicializações Visuais
     if (typeof initTheme === 'function') initTheme();
@@ -2053,7 +3089,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const loginForm = document.getElementById("loginForm");
     if (loginForm && typeof initLogin === 'function') initLogin(loginForm);
 
-    if (document.querySelector('.account-info-card') && typeof initMinhaConta === 'function') {
+    if (document.querySelector('.dashboard-wrapper') && typeof initMinhaConta === 'function') {
         initMinhaConta();
     }
 
@@ -2079,14 +3115,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const type = params.get('type');
     const search = params.get('search');
     const isHub = params.get('global') === 'true';
+    const isMulti = params.get('multi') === 'true';
 
     // Seletor de Página
     if (path.includes('detalhes') && id && type) {
         if (typeof loadDetails === 'function') loadDetails(type, id);
     }
     else if (path.includes('filmes')) {
-        currentType = 'movie';
-        if (search && typeof handleSearchRouting === 'function') handleSearchRouting(search, 'movie', isHub);
+        currentType = isMulti ? 'search' : 'movie';
+        if (search && typeof handleSearchRouting === 'function') handleSearchRouting(search, isMulti ? 'multi' : 'movie', isHub);
         else if (typeof loadCatalog === 'function') loadCatalog('movie', 1);
     }
     else if (path.includes('series')) {
@@ -2223,35 +3260,45 @@ function initGlobalLoader() {
     // --- EVENTOS ---
 
     // 1. Ao carregar a página: Esconde o loader (Fade Out)
-    // Pequeno delay para garantir que o layout carregou
     window.addEventListener('load', () => setTimeout(hideLoader, 300));
 
     // 2. Correção para botão "Voltar" (Safari/Mobile)
     window.addEventListener('pageshow', hideLoader);
 
-    // 3. Interceptar Cliques
+    // 3. Interceptar Cliques - COM TRANSIÇÃO DE POSTER PARA DETALHES
     document.addEventListener('click', (e) => {
         const link = e.target.closest('a');
+        if (!link) return;
 
-        // Só ativa se for link interno real
-        if (link && link.href &&
+        // Se o link aponta para detalhes.html, faz a transição da capa sem loader
+        if (link.href && link.href.includes('detalhes')) {
+            const img = link.querySelector('img');
+            if (img) {
+                img.style.viewTransitionName = 'poster-morph';
+            }
+            // Deixa a navegação natural acontecer. O navegador fará a View Transition
+            // cruzada de documentos de forma nativa e extremamente fluida graças ao CSS!
+            return;
+        }
+
+        // Para outros links internos, usa o loader escuro
+        if (link.href &&
             link.href.includes(window.location.hostname) &&
             !link.target &&
             !link.href.includes('#') &&
             !link.getAttribute('download') &&
             !link.href.includes('javascript')) {
 
-            e.preventDefault(); // Para a navegação padrão
+            e.preventDefault();
+            showLoader();
 
-            showLoader(); // Tela fica preta instantaneamente
-
-            // Espera o tempo "cinematográfico" antes de trocar
             setTimeout(() => {
                 window.location.href = link.href;
-            }, 1000);
+            }, 600);
         }
     });
 }
+
 
 // --- FUNÇÕES DE AUTH QUE FALTAVAM ---
 
@@ -2298,7 +3345,9 @@ function initCadastro(form) {
                 username: nome,
                 email: email,
                 minhaLista: [],
-                history: []
+                history: [],
+                reviews: [],
+                favoritos: []
             });
 
             showToast("Conta criada com sucesso!", "success");
@@ -2310,3 +3359,157 @@ function initCadastro(form) {
         }
     }
 }
+
+// =================================================================
+// 7. MODAL DE PRODUÇÕES DO FAMOSO (ELENCO PRINCIPAL)
+// =================================================================
+
+window.showFamousWorks = async function(personId, personName) {
+    showToast(`Buscando produções de ${personName}...`, "info");
+    try {
+        const data = await fetchTMDB(`/person/${personId}/combined_credits`);
+        if (!data || !data.cast || data.cast.length === 0) {
+            return showToast("Nenhuma obra encontrada para este famoso.", "error");
+        }
+
+        // Filtra todas as obras válidas que tenham capa
+        let allWorks = data.cast
+            .filter(item => item.poster_path && (item.title || item.name))
+            .sort((a, b) => b.popularity - a.popularity);
+
+        if (allWorks.length === 0) {
+            return showToast("Nenhuma obra relevante encontrada.", "error");
+        }
+
+        // Divide o array: as primeiras 12 mais populares são exibidas inicialmente
+        let primaryWorks = allWorks.slice(0, 12);
+        let remainingWorks = allWorks.slice(12);
+
+        // Cria o elemento do modal se ele não existir
+        let modal = document.getElementById('famous-works-modal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'famous-works-modal';
+            modal.className = 'famous-modal';
+            document.body.appendChild(modal);
+        }
+
+        // Helper de HTML do card de obra do famoso
+        const getWorkCardHtml = (work) => {
+            const title = work.title || work.name;
+            const poster = `${IMG_BASE}${work.poster_path}`;
+            let typeTxt = work.media_type === 'movie' ? 'Filme' : 'Série';
+            const isAnime = (work.original_language === 'ja' && work.genre_ids && work.genre_ids.includes(16)) || (work.media_type === 'tv' && work.original_language === 'ja');
+            if (isAnime) typeTxt = 'Anime';
+            const date = work.release_date || work.first_air_date || '';
+            const year = date ? ` (${date.substring(0, 4)})` : '';
+            const rating = work.vote_average ? work.vote_average.toFixed(1) : 'N/A';
+
+            return `
+            <a href="detalhes.html?id=${work.id}&type=${work.media_type}" class="famous-work-card" onclick="document.getElementById('famous-works-modal').classList.remove('show')">
+                <div class="famous-work-poster">
+                    <img src="${poster}" alt="${title}" loading="lazy" />
+                    <span class="famous-work-rating"><i class="fas fa-star"></i> ${rating}</span>
+                </div>
+                <div class="famous-work-info">
+                    <h4>${title}${year}</h4>
+                    <span class="famous-work-type">${typeTxt}</span>
+                </div>
+            </a>
+            `;
+        };
+
+        const worksHtml = primaryWorks.map(getWorkCardHtml).join('');
+
+        modal.innerHTML = `
+        <div class="famous-modal-content">
+            <div class="famous-modal-header">
+                <h3><i class="fas fa-film" style="color: #e50914; margin-right: 8px;"></i> Obras de ${personName}</h3>
+                <button id="close-famous-modal" class="close-famous-btn"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="famous-modal-body">
+                <div class="famous-works-grid" id="famous-grid">
+                    ${worksHtml}
+                </div>
+                ${remainingWorks.length > 0 ? `
+                <div class="famous-expand-container" id="expand-container" style="text-align: center; margin-top: 25px;">
+                    <button id="btn-expand-works" class="btn-expand-famous">
+                        Ver Todas as Obras (+${remainingWorks.length})
+                    </button>
+                </div>
+                ` : ''}
+            </div>
+        </div>
+        `;
+
+        modal.classList.add('show');
+
+        // Configuração do clique no botão de expandir (Ver Todas)
+        if (remainingWorks.length > 0) {
+            const btnExpand = document.getElementById('btn-expand-works');
+            btnExpand.onclick = () => {
+                const grid = document.getElementById('famous-grid');
+                const expandContainer = document.getElementById('expand-container');
+
+                const remainingHtml = remainingWorks.map(work => {
+                    const title = work.title || work.name;
+                    const poster = `${IMG_BASE}${work.poster_path}`;
+                    let typeTxt = work.media_type === 'movie' ? 'Filme' : 'Série';
+                    const isAnime = (work.original_language === 'ja' && work.genre_ids && work.genre_ids.includes(16)) || (work.media_type === 'tv' && work.original_language === 'ja');
+                    if (isAnime) typeTxt = 'Anime';
+                    const date = work.release_date || work.first_air_date || '';
+                    const year = date ? ` (${date.substring(0, 4)})` : '';
+                    const rating = work.vote_average ? work.vote_average.toFixed(1) : 'N/A';
+
+                    return `
+                    <a href="detalhes.html?id=${work.id}&type=${work.media_type}" class="famous-work-card remaining-card" style="opacity: 0; transform: translateY(15px); transition: all 0.4s ease;" onclick="document.getElementById('famous-works-modal').classList.remove('show')">
+                        <div class="famous-work-poster">
+                            <img src="${poster}" alt="${title}" loading="lazy" />
+                            <span class="famous-work-rating"><i class="fas fa-star"></i> ${rating}</span>
+                        </div>
+                        <div class="famous-work-info">
+                            <h4>${title}${year}</h4>
+                            <span class="famous-work-type">${typeTxt}</span>
+                        </div>
+                    </a>
+                    `;
+                }).join('');
+
+                grid.insertAdjacentHTML('beforeend', remainingHtml);
+
+                // Dispara animação escalonada (cascade/staggered)
+                setTimeout(() => {
+                    const remainingCards = grid.querySelectorAll('.remaining-card');
+                    remainingCards.forEach((card, index) => {
+                        setTimeout(() => {
+                            card.style.opacity = '1';
+                            card.style.transform = 'translateY(0)';
+                        }, index * 30); // Intervalo de 30ms cria um belo efeito dinâmico
+                    });
+                }, 50);
+
+                // Desaparecimento suave do botão
+                expandContainer.style.opacity = '0';
+                expandContainer.style.transform = 'scale(0.9)';
+                expandContainer.style.transition = 'all 0.3s ease';
+                setTimeout(() => expandContainer.remove(), 300);
+            };
+        }
+
+        // Fecha o modal ao clicar no botão de fechar
+        document.getElementById('close-famous-modal').onclick = () => {
+            modal.classList.remove('show');
+        };
+
+        // Fecha o modal ao clicar fora do conteúdo
+        modal.onclick = (e) => {
+            if (e.target === modal) {
+                modal.classList.remove('show');
+            }
+        };
+
+    } catch (error) {
+        console.error("Erro ao carregar obras do ator:", error);
+        showToast("Erro ao buscar produções do famoso.", "error");
+    }
+};

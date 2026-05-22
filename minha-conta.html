@@ -4,10 +4,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>WinBry+ | Minha Conta</title>
+  <title>WinBry | Minha Conta</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/core-js/3.32.1/minified.js"></script>
   <link rel="icon" href="images/favicon.png" />
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css?v=2026.05.22.4" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
   <link rel="manifest" href="/manifest.json">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -22,7 +22,7 @@
   <header>
     <div class="container">
       <div class="logo">
-        <a class="btn-log" href="index.html">WinBry+</a>
+        <a class="btn-log" href="index.html">WinBry</a>
       </div>
       <nav class="main-nav">
         <ul>
@@ -42,57 +42,181 @@
     </div>
   </header>
 
-  <div class="account-info-card">
-    <h2 class="card-title">Configurações da Conta</h2>
-
-    <div class="card-content-wrapper">
-      <div class="profile-column">
-        <img id="profile-pic" src="images/foto-generica.jpg" alt="Foto de Perfil" />
-        <label for="upload-pic" class="custom-file-upload">
-          <i class="fas fa-camera"></i> Alterar Foto
-        </label>
-        <input type="file" id="upload-pic" accept="image/*" />
+  <div class="dashboard-wrapper">
+    <!-- Barra Lateral do Dashboard -->
+    <aside class="dashboard-sidebar">
+      <div class="sidebar-user-info">
+        <div class="sidebar-avatar-wrapper">
+          <img id="sidebar-profile-pic" src="images/foto-generica.jpg" alt="Foto de Perfil" />
+        </div>
+        <h3 id="sidebar-username">Carregando...</h3>
       </div>
 
-      <div class="data-column">
-        <div class="data-group">
-          <strong>Nome de Usuário</strong>
-          <div class="data-value-row">
-            <span id="display-username">Carregando...</span>
-            <button id="btn-edit-profile" class="btn-icon-edit" title="Editar Dados">
-              <i class="fas fa-pen"></i>
-            </button>
+      <nav class="sidebar-nav">
+        <button class="nav-tab-btn active" data-tab="tab-overview">
+          <i class="fas fa-chart-line"></i> Dashboard
+        </button>
+        <button class="nav-tab-btn" data-tab="tab-likes">
+          <i class="fas fa-heart"></i> Minhas Curtidas
+        </button>
+        <button class="nav-tab-btn" data-tab="tab-reviews">
+          <i class="fas fa-star"></i> Minhas Resenhas
+        </button>
+        <button class="nav-tab-btn" data-tab="tab-settings">
+          <i class="fas fa-user-cog"></i> Configurações
+        </button>
+      </nav>
+    </aside>
+
+    <!-- Conteúdo das Abas do Dashboard -->
+    <main class="dashboard-content">
+      
+      <!-- ABA 1: VISÃO GERAL (DASHBOARD) -->
+      <div class="dashboard-tab active" id="tab-overview">
+        <div class="tab-header">
+          <h2>Bem-vindo de volta!</h2>
+          <p>Confira suas atividades cinematográficas e dados de uso no WinBry.</p>
+        </div>
+
+        <!-- Painel de Métricas / Estatísticas -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon"><i class="fas fa-pen-fancy"></i></div>
+            <div class="stat-info">
+              <span class="stat-label">Resenhas Criadas</span>
+              <h3 id="stat-reviews-count">0</h3>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon"><i class="fas fa-star"></i></div>
+            <div class="stat-info">
+              <span class="stat-label">Média de Notas</span>
+              <h3 id="stat-reviews-average">0.0</h3>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="color: #e50914; background: rgba(229, 9, 20, 0.08);"><i class="fas fa-heart"></i></div>
+            <div class="stat-info">
+              <span class="stat-label">Meus Favoritos</span>
+              <h3 id="stat-favorites-count">0</h3>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="color: #2ecc71; background: rgba(46, 204, 113, 0.08);"><i class="fas fa-bookmark"></i></div>
+            <div class="stat-info">
+              <span class="stat-label">Itens na Lista</span>
+              <h3 id="stat-watchlist-count">0</h3>
+            </div>
           </div>
         </div>
 
-        <div class="data-group">
-          <strong>E-mail de Acesso</strong>
-          <div class="data-value-row">
-            <span id="display-email">Carregando...</span>
+        <!-- Banner de Boas-vindas -->
+        <div class="overview-welcome-card">
+          <div class="welcome-card-content">
+            <h3>Seu Diário Cinéfilo WinBry 🎬</h3>
+            <p>Escreva resenhas completas, dê notas de 0.5 a 5.0 estrelas (com suporte a meia estrela!) e monte o seu perfil de cinema integrado ao banco de dados e à BryIA!</p>
+            <button class="btn btn-primary btn-go-to-reviews">Criar Minha Primeira Resenha</button>
           </div>
         </div>
 
-        <div class="data-group">
-          <strong>Plano Atual</strong>
-          <span class="plan-badge">Básico</span>
+      </div>
+
+      <!-- ABA: MINHAS CURTIDAS -->
+      <div class="dashboard-tab" id="tab-likes">
+        <div class="tab-header">
+          <h2>Minhas Curtidas</h2>
+          <p>Seus filmes e séries favoritos guardados no WinBry.</p>
         </div>
 
-        <div class="data-group">
-          <strong>Chave da API (Gemini AI)</strong>
-          <div style="display:flex; gap:10px; width:100%; align-items: center;">
-            <input type="password" id="user-api-key" placeholder="Cole sua API Key aqui"
-              style="background:transparent; border:none; border-bottom:1px solid #333; color:white; flex:1; padding:8px;">
-            <button id="btn-save-key" class="btn btn-primary"
-              style="padding: 5px 15px; font-size: 0.8rem; height: 30px;">Salvar</button>
+        <div class="dashboard-favoritos-section" style="margin-top: 20px;">
+          <div id="favoritos-list-container" style="display: flex; gap: 20px; overflow-x: auto; padding: 10px 5px 20px 5px; scrollbar-width: thin; scrollbar-color: #e50914 #141414;">
+            <!-- Renderizado dinamicamente pelo JavaScript -->
           </div>
-          <small style="color:#666; font-size:0.75rem; margin-top:5px;">Necessário para usar a BryIA.</small>
-        </div>
-
-        <div class="action-buttons">
-          <button class="btn-logout">Sair da Conta</button>
         </div>
       </div>
-    </div>
+
+      <!-- ABA 2: RESENHAS (LETTERBOXD STYLE) -->
+      <div class="dashboard-tab" id="tab-reviews">
+        <div class="tab-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px; margin-bottom: 30px;">
+          <div>
+            <h2>Diário de Resenhas</h2>
+            <p>Compartilhe sua opinião sobre as produções que assistiu no WinBry.</p>
+          </div>
+          <button id="btn-open-review-form" class="btn btn-primary"><i class="fas fa-plus"></i> Escrever Resenha</button>
+        </div>
+
+        <!-- Listagem dinâmica de resenhas do usuário -->
+        <div id="reviews-list-container" class="reviews-list-grid">
+          <div class="empty-reviews-state">
+            <i class="fas fa-comment-slash"></i>
+            <h3>Sua estante de resenhas está vazia.</h3>
+            <p>Comece a resenhar seus filmes favoritos clicando em "Escrever Resenha"!</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ABA 3: CONFIGURAÇÕES DA CONTA (EDITAR PERFIL) -->
+      <div class="dashboard-tab" id="tab-settings">
+        <div class="tab-header">
+          <h2>Configurações da Conta</h2>
+          <p>Gerencie seus dados de acesso, chave da API Gemini e foto de perfil.</p>
+        </div>
+
+        <div class="settings-form-wrapper">
+          <div class="settings-avatar-section">
+            <img id="profile-pic" src="images/foto-generica.jpg" alt="Foto de Perfil" />
+            <label for="upload-pic" class="custom-file-upload">
+              <i class="fas fa-camera"></i> Alterar Foto
+            </label>
+            <input type="file" id="upload-pic" accept="image/*" />
+          </div>
+
+          <div class="settings-fields-section">
+            <div class="data-group">
+              <strong>Nome de Usuário</strong>
+              <div class="data-value-row">
+                <span id="display-username">Carregando...</span>
+                <button id="btn-edit-profile" class="btn-icon-edit" title="Editar Dados">
+                  <i class="fas fa-pen"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="data-group">
+              <strong>E-mail de Acesso</strong>
+              <div class="data-value-row">
+                <span id="display-email">Carregando...</span>
+              </div>
+            </div>
+
+            <div class="data-group">
+              <strong>Plano Atual</strong>
+              <span class="plan-badge">Básico</span>
+            </div>
+
+            <div class="data-group">
+              <strong>Chave da API (Gemini AI)</strong>
+              <div style="display:flex; gap:10px; width:100%; align-items: center;">
+                <input type="password" id="user-api-key" placeholder="Cole sua API Key aqui"
+                  style="background:transparent; border:none; border-bottom:1px solid #333; color:white; flex:1; padding:8px;">
+                <button id="btn-save-key" class="btn btn-primary"
+                  style="padding: 5px 15px; font-size: 0.8rem; height: 30px;">Salvar</button>
+              </div>
+              <small style="color:#666; font-size:0.75rem; margin-top:5px;">Necessário para usar a BryIA.</small>
+            </div>
+
+            <div class="account-actions-wrapper">
+              <button id="btn-clear-history" class="btn-clear-history">
+                <i class="fas fa-trash-alt"></i> Limpar Histórico do Player
+              </button>
+              <button class="btn-logout-danger">
+                <i class="fas fa-sign-out-alt"></i> Sair da Conta
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
   </div>
   <div id="edit-profile-modal" class="modal-overlay">
     <div class="modal-box">
@@ -115,10 +239,83 @@
       </form>
     </div>
   </div>
+  
+  <!-- MODAL DE CRIAR/EDITAR RESENHA (LETTERBOXD STYLE) -->
+  <div id="review-modal" class="modal-overlay">
+    <div class="modal-box review-modal-box">
+      <div class="modal-header">
+        <h3 id="review-modal-title">Nova Resenha</h3>
+        <span id="btn-close-review-modal" class="btn-close-modal">&times;</span>
+      </div>
+      
+      <form id="reviewForm" autocomplete="off">
+        <input type="hidden" id="review-edit-id" value="">
+        
+        <!-- Etapa 1: Buscar e Selecionar Filme -->
+        <div class="form-group" id="movie-search-section">
+          <label>Pesquisar Filme / Série</label>
+          <div class="search-input-wrapper" style="position:relative; display:flex; align-items:center;">
+            <input type="text" id="review-movie-search" placeholder="Digite o título para buscar..." 
+              style="width:100%; padding-right:40px;" />
+            <i class="fas fa-search search-icon-inside" style="position:absolute; right:15px; color:#666;"></i>
+          </div>
+          <!-- Dropdown flutuante de resultados -->
+          <div id="search-results-dropdown" class="search-results-dropdown"></div>
+        </div>
+
+        <!-- Conteiner do Filme Selecionado -->
+        <div id="selected-movie-container" class="selected-movie-container" style="display:none;">
+          <input type="hidden" id="review-movie-id" value="">
+          <input type="hidden" id="review-movie-title" value="">
+          <input type="hidden" id="review-movie-poster" value="">
+          <input type="hidden" id="review-movie-type" value="movie"> <!-- movie ou tv -->
+          
+          <img id="selected-movie-poster-img" src="" alt="Poster" />
+          <div class="selected-movie-info">
+            <h4 id="selected-movie-title-txt">Título do Filme</h4>
+            <span id="selected-movie-year" class="selected-movie-year">2026</span>
+            <button type="button" id="btn-remove-selected-movie" class="btn-remove-selected"><i class="fas fa-times"></i> Trocar Produção</button>
+          </div>
+        </div>
+
+        <!-- Etapa 2: Estrelas Interativas (0.5 a 5.0) -->
+        <div class="form-group" style="margin-top:20px;">
+          <label>Sua Nota (0.5 a 5.0 estrelas)</label>
+          <div class="rating-stars-wrapper" style="display:flex; align-items:center; gap:15px; margin-top:5px;">
+            <div class="star-rating-interactive" id="star-rating-interactive" style="display:flex; gap:5px; font-size:2rem; color:#ffd700; cursor:pointer;">
+              <i class="far fa-star" data-index="1" style="position:relative;"></i>
+              <i class="far fa-star" data-index="2" style="position:relative;"></i>
+              <i class="far fa-star" data-index="3" style="position:relative;"></i>
+              <i class="far fa-star" data-index="4" style="position:relative;"></i>
+              <i class="far fa-star" data-index="5" style="position:relative;"></i>
+            </div>
+            <span id="rating-display-value" class="rating-display-value" style="font-size:1.1rem; font-weight:bold; color:#ff4444; background:rgba(255,255,255,0.05); padding:4px 10px; border-radius:4px;">Sem Nota</span>
+            <input type="hidden" id="review-rating-val" value="0">
+          </div>
+        </div>
+
+        <!-- Etapa 3: Título e Texto da Resenha -->
+        <div class="form-group">
+          <label>Título da Resenha</label>
+          <input type="text" id="review-title" required placeholder="Ex: Absolutamente fantástico! Um clássico imediato." />
+        </div>
+
+        <div class="form-group">
+          <label>Sua Resenha</label>
+          <textarea id="review-body" required placeholder="Escreva detalhadamente o que você achou da direção, atuações, história, etc..." style="min-height:120px;"></textarea>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" id="btn-cancel-review" class="btn-ghost">Cancelar</button>
+          <button type="submit" class="btn btn-primary" id="btn-save-review">Salvar Resenha</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <footer>
     <div class="container">
-      <p>&copy; 2026 WinBry+ | Todos os direitos reservados.</p>
+      <p>&copy; 2026 WinBry | Todos os direitos reservados.</p>
       <div class="social-links">
         <a href="#"><i class="fab fa-facebook-f"></i></a>
         <a href="#"><i class="fab fa-twitter"></i></a>
@@ -135,7 +332,7 @@
     </div>
   </div>
 
-  <script src="/app.js"></script>
+  <script src="app.js?v=2026.05.22.4"></script>
 </body>
 
 </html>

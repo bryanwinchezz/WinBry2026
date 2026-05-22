@@ -1,6 +1,6 @@
-{
-  "name": "WinBry+ Streaming",
-  "short_name": "WinBry+",
+﻿{
+  "name": "WinBry Streaming",
+  "short_name": "WinBry",
   "start_url": "/index.html",
   "display": "standalone",
   "background_color": "#141414",
