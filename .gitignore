@@ -1,0 +1,17 @@
+# Dependências do Node.js (Pastas gigantes geradas localmente)
+node_modules/
+
+# Pastas de build do Electron (Arquivos compilados pesados)
+dist/
+dist-installer/
+
+# Arquivos executáveis e instaladores finais
+# (Devem ser distribuídos pelo Netlify ou releases do GitHub, não guardados no código)
+WinBry-Setup.exe
+winbry.apk
+WinBry.zip
+
+# Arquivos do sistema operacional e logs temporários
+*.log
+.DS_Store
+Thumbs.db

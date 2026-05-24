@@ -1,0 +1,43 @@
+{
+  "name": "winbry-streaming",
+  "version": "1.0.0",
+  "description": "WinBry Streaming - Aplicativo Desktop Oficial",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build:win": "electron-builder --win"
+  },
+  "keywords": [
+    "streaming",
+    "winbry",
+    "desktop"
+  ],
+  "author": "WinBry",
+  "license": "ISC",
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-packager": "^17.1.2",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.winbry.streaming",
+    "productName": "WinBry",
+    "artifactName": "WinBry-Setup.${ext}",
+    "directories": {
+      "output": "dist-installer"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "images/favicon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "WinBry Streaming",
+      "installerHeaderIcon": "images/favicon.png"
+    }
+  }
+}
