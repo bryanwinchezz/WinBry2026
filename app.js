@@ -50,7 +50,7 @@ const BRAND_MAP = {
 
     // Sagas Fechadas (Mantidas como Collection pois são sequências diretas)
     'star wars': { type: 'collection', id: '10', title: 'Coleção Star Wars' },
-    'invocacao': { type: 'collection', id: '313086', title: 'Coleção Invocação do Mal' },
+    'invocacao': { type: 'collection', id: '313086|402074|968052', title: 'Coleção Invocação do Mal' },
     'harry potter': { type: 'collection', id: '1241', title: 'Coleção Harry Potter' },
     'jurassic': { type: 'collection', id: '328', title: 'Coleção Jurassic Park' },
     'velozes': { type: 'collection', id: '9485', title: 'Saga Velozes e Furiosos' },
@@ -150,7 +150,7 @@ auth.onAuthStateChanged(async (user) => {
 
     // Se estiver na página "Minha Lista", "Home" ou "Dashboard Perfil", recarrega
     if (document.getElementById('lista-container') && typeof initMinhaListaPage === 'function') initMinhaListaPage();
-    if ((document.getElementById('hero-section') || document.querySelector('.continue-watching-section') || document.querySelector('.main-slider')) && typeof loadContinueWatching === 'function') loadContinueWatching();
+    if (document.getElementById('continue-watching-section') && typeof loadContinueWatching === 'function') loadContinueWatching();
     if (document.querySelector('.dashboard-wrapper') && typeof initMinhaConta === 'function') initMinhaConta();
 
     // Se estiver na página de detalhes, atualiza os botões ao resolver a autenticação (Verificação robusta pelo DOM)
@@ -226,6 +226,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // AQUI ESTÁ A CORREÇÃO: Removemos o ".html" das verificações
+    const isEasterEgg = params.get('easteregg') === 'true';
+
     if (path.includes('detalhes')) {
         if (id && type) loadDetails(type, id);
     }
@@ -233,7 +235,10 @@ document.addEventListener('DOMContentLoaded', () => {
         currentType = isMulti ? 'search' : 'movie';
         const genre = params.get('genre');
         const lang = params.get('lang');
-        if (search) handleSearchRouting(search, isMulti ? 'multi' : 'movie', isHub);
+        if (isEasterEgg) {
+            loadAdultEasterEgg(1);
+        }
+        else if (search) handleSearchRouting(search, isMulti ? 'multi' : 'movie', isHub);
         else if (genre) loadCatalog('movie', 1, genre, lang || null);
         else loadCatalog('movie', 1);
     }
@@ -694,15 +699,32 @@ async function loadCatalog(type, page, genreId, langFilter) {
         results = [...movies, ...tvs];
         // Ordenação robusta baseada em popularidade
         results.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+        results = results.slice(0, 24);
 
-        const maxPages = Math.max(resMovie ? resMovie.total_pages || 0 : 0, resTV ? resTV.total_pages || 0 : 0);
-        totalPages = Math.min(maxPages, 500);
+        const totalItemsCombined = (resMovie ? resMovie.total_results || 0 : 0) + (resTV ? resTV.total_results || 0 : 0);
+        totalPages = Math.min(Math.ceil(totalItemsCombined / 24), 500);
         gridType = 'multi';
     } else {
-        const endpoint = `/discover/${type}?sort_by=popularity.desc&include_adult=false&page=${page}`;
-        const data = await fetchTMDB(endpoint);
-        results = (data && data.results) ? data.results : [];
-        totalPages = Math.min(data ? data.total_pages || 1 : 1, 500);
+        const startIdx = (page - 1) * 24;
+        const endIdx = page * 24;
+        const pageA = Math.floor(startIdx / 20) + 1;
+        const pageB = Math.floor((endIdx - 1) / 20) + 1;
+
+        const endpointA = `/discover/${type}?sort_by=popularity.desc&include_adult=false&page=${pageA}`;
+        const endpointB = `/discover/${type}?sort_by=popularity.desc&include_adult=false&page=${pageB}`;
+
+        const [dataA, dataB] = await Promise.all([fetchTMDB(endpointA), fetchTMDB(endpointB)]);
+        const resultsA = (dataA && dataA.results) ? dataA.results : [];
+        const resultsB = (dataB && dataB.results) ? dataB.results : [];
+
+        const allItems = [];
+        const startOffset = startIdx % 20;
+        allItems.push(...resultsA.slice(startOffset));
+        allItems.push(...resultsB);
+
+        results = allItems.slice(0, 24);
+        const totalItemsTMDB = (dataA ? dataA.total_results || 0 : 0);
+        totalPages = Math.min(Math.ceil(totalItemsTMDB / 24), 500);
     }
 
     renderGrid(results, gridType, titulo);
@@ -714,12 +736,28 @@ async function loadAnimes(page) {
     currentPage = page;
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
-    const endpoint = `/discover/tv?with_genres=16&with_original_language=ja&sort_by=popularity.desc&include_adult=false&without_keywords=9819&page=${page}`;
-    const data = await fetchTMDB(endpoint);
+    const startIdx = (page - 1) * 24;
+    const endIdx = page * 24;
+    const pageA = Math.floor(startIdx / 20) + 1;
+    const pageB = Math.floor((endIdx - 1) / 20) + 1;
 
-    const totalPages = Math.min(data.total_pages, 500);
+    const endpointA = `/discover/tv?with_genres=16&with_original_language=ja&sort_by=popularity.desc&include_adult=false&without_keywords=9819&page=${pageA}`;
+    const endpointB = `/discover/tv?with_genres=16&with_original_language=ja&sort_by=popularity.desc&include_adult=false&without_keywords=9819&page=${pageB}`;
 
-    const animesFiltrados = filterAdultAnimes((data && data.results) || []);
+    const [dataA, dataB] = await Promise.all([fetchTMDB(endpointA), fetchTMDB(endpointB)]);
+    const resultsA = (dataA && dataA.results) ? dataA.results : [];
+    const resultsB = (dataB && dataB.results) ? dataB.results : [];
+
+    const allItems = [];
+    const startOffset = startIdx % 20;
+    allItems.push(...resultsA.slice(startOffset));
+    allItems.push(...resultsB);
+
+    const mergedAnimes = allItems.slice(0, 24);
+    const animesFiltrados = filterAdultAnimes(mergedAnimes); // Bloqueia animes adultos no catálogo de animes
+
+    const totalItemsTMDB = (dataA ? dataA.total_results || 0 : 0);
+    const totalPages = Math.min(Math.ceil(totalItemsTMDB / 24), 500);
 
     renderGrid(animesFiltrados, 'tv', 'Animes');
     renderPagination(totalPages, page, (p) => loadAnimes(p));
@@ -729,16 +767,32 @@ async function loadSearch(query, type, page) {
     currentPage = page;
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
-    const endpoint = `/search/${type}?query=${encodeURIComponent(query)}&page=${page}`;
-    const data = await fetchTMDB(endpoint);
+    const startIdx = (page - 1) * 24;
+    const endIdx = page * 24;
+    const pageA = Math.floor(startIdx / 20) + 1;
+    const pageB = Math.floor((endIdx - 1) / 20) + 1;
 
-    const totalPages = Math.min(data.total_pages, 500);
+    const endpointA = `/search/${type}?query=${encodeURIComponent(query)}&page=${pageA}`;
+    const endpointB = `/search/${type}?query=${encodeURIComponent(query)}&page=${pageB}`;
 
-    let results = data.results || [];
+    const [dataA, dataB] = await Promise.all([fetchTMDB(endpointA), fetchTMDB(endpointB)]);
+    let resultsA = dataA.results || [];
+    let resultsB = dataB.results || [];
+
     if (type === 'multi') {
-        results = results.filter(item => item.media_type === 'movie' || item.media_type === 'tv');
+        resultsA = resultsA.filter(item => item.media_type === 'movie' || item.media_type === 'tv');
+        resultsB = resultsB.filter(item => item.media_type === 'movie' || item.media_type === 'tv');
     }
-    results = filterAdultAnimes(results);
+
+    const allItems = [];
+    const startOffset = startIdx % 20;
+    allItems.push(...resultsA.slice(startOffset));
+    allItems.push(...resultsB);
+
+    let results = allItems.slice(0, 24);
+
+    const totalItemsTMDB = (dataA ? dataA.total_results || 0 : 0);
+    const totalPages = Math.min(Math.ceil(totalItemsTMDB / 24), 500);
 
     const titleText = type === 'multi' 
         ? `<span class="pesquisa-destaque">Pesquisa Global:</span> "${query}"` 
@@ -755,36 +809,98 @@ async function loadBrandContent(key, page) {
     const brand = BRAND_MAP[key];
     if (!brand) return;
 
-    // Lógica Especial para Coleções (Sagas)
+    // Lógica Especial para Coleções (Sagas com suporte a múltiplos IDs de Coleções/Filmes por '|')
     if (brand.type === 'collection') {
-        // Coleções não têm paginação no TMDB, elas retornam tudo de uma vez
-        const endpoint = `/collection/${brand.id}`;
-        const data = await fetchTMDB(endpoint);
+        const parts = brand.id.split('|');
+        const fetchPromises = parts.map(async (part) => {
+            if (part.startsWith('movie:')) {
+                const movieId = part.replace('movie:', '');
+                const movieData = await fetchTMDB(`/movie/${movieId}`);
+                return movieData ? [movieData] : [];
+            } else {
+                const data = await fetchTMDB(`/collection/${part}`);
+                return (data && data.parts) ? data.parts : [];
+            }
+        });
 
-        if (data && data.parts) {
-            // Filtra apenas os que têm poster e ordena por lançamento (opcional)
-            const filmes = data.parts.filter(m => m.poster_path);
+        const resultsArray = await Promise.all(fetchPromises);
+        let filmes = [];
+        resultsArray.forEach(arr => {
+            if (arr && arr.length > 0) filmes.push(...arr);
+        });
 
-            // Renderiza tudo e esconde a paginação (passa 1 de 1)
-            renderGrid(filmes, 'movie', brand.title);
+        // Remove duplicatas baseadas no ID do TMDB
+        const uniqueFilmes = [];
+        const seenIds = new Set();
+        filmes.forEach(f => {
+            if (f && f.id && !seenIds.has(f.id)) {
+                seenIds.add(f.id);
+                uniqueFilmes.push(f);
+            }
+        });
+
+        if (uniqueFilmes.length > 0) {
+            let validFilmes = uniqueFilmes.filter(m => m.poster_path);
+
+            // Ordena cronologicamente por lançamento para ficar perfeito
+            validFilmes.sort((a, b) => {
+                const dateA = a.release_date || '0000-00-00';
+                const dateB = b.release_date || '0000-00-00';
+                return dateA.localeCompare(dateB);
+            });
+
+            // =================================================================
+            // 💡 COMO ADICIONAR FILMES MANUALMENTE NESTA FRANQUIA:
+            // Você pode colocar IDs de coleções ou filmes individuais separados por '|'
+            // diretamente na definição do BRAND_MAP no topo do arquivo app.js!
+            // Exemplo: 'invocacao': { type: 'collection', id: '313086|movie:439079', ... }
+            // =================================================================
+
+            // Renderiza tudo junto na tela e esconde a paginação (passa 1 de 1)
+            renderGrid(validFilmes, 'movie', brand.title);
+            renderPagination(1, 1, null);
+        } else {
+            renderGrid([], 'movie', brand.title);
             renderPagination(1, 1, null);
         }
         return;
     }
 
-    // Lógica Padrão para Empresas e Keywords
-    let endpoint = '';
-    if (brand.type === 'company') endpoint = `/discover/movie?with_companies=${brand.id}&sort_by=popularity.desc&include_adult=false&page=${page}`;
-    else if (brand.type === 'network') endpoint = `/discover/tv?with_networks=${brand.id}&sort_by=popularity.desc&include_adult=false&page=${page}`;
-    else if (brand.type === 'keyword') endpoint = `/discover/movie?with_keywords=${brand.id}&sort_by=popularity.desc&include_adult=false&page=${page}`;
+    // Lógica Padrão para Empresas e Keywords (24 itens por página)
+    const startIdx = (page - 1) * 24;
+    const endIdx = page * 24;
+    const pageA = Math.floor(startIdx / 20) + 1;
+    const pageB = Math.floor((endIdx - 1) / 20) + 1;
 
-    const data = await fetchTMDB(endpoint);
+    let endpointA = '';
+    let endpointB = '';
 
-    // Trava de 500 páginas do TMDB
-    const totalPages = Math.min(data.total_pages, 500);
+    if (brand.type === 'company') {
+        endpointA = `/discover/movie?with_companies=${brand.id}&sort_by=popularity.desc&include_adult=false&page=${pageA}`;
+        endpointB = `/discover/movie?with_companies=${brand.id}&sort_by=popularity.desc&include_adult=false&page=${pageB}`;
+    } else if (brand.type === 'network') {
+        endpointA = `/discover/tv?with_networks=${brand.id}&sort_by=popularity.desc&include_adult=false&page=${pageA}`;
+        endpointB = `/discover/tv?with_networks=${brand.id}&sort_by=popularity.desc&include_adult=false&page=${pageB}`;
+    } else if (brand.type === 'keyword') {
+        endpointA = `/discover/movie?with_keywords=${brand.id}&sort_by=popularity.desc&include_adult=false&page=${pageA}`;
+        endpointB = `/discover/movie?with_keywords=${brand.id}&sort_by=popularity.desc&include_adult=false&page=${pageB}`;
+    }
+
+    const [dataA, dataB] = await Promise.all([fetchTMDB(endpointA), fetchTMDB(endpointB)]);
+    const resultsA = (dataA && dataA.results) ? dataA.results : [];
+    const resultsB = (dataB && dataB.results) ? dataB.results : [];
+
+    const allItems = [];
+    const startOffset = startIdx % 20;
+    allItems.push(...resultsA.slice(startOffset));
+    allItems.push(...resultsB);
+
+    const results = allItems.slice(0, 24);
+    const totalItemsTMDB = (dataA ? dataA.total_results || 0 : 0);
+    const totalPages = Math.min(Math.ceil(totalItemsTMDB / 24), 500);
     const mediaType = brand.type === 'network' ? 'tv' : 'movie';
 
-    renderGrid(data.results, mediaType, brand.title);
+    renderGrid(results, mediaType, brand.title);
     renderPagination(totalPages, page, (p) => loadBrandContent(key, p));
 }
 
@@ -2116,10 +2232,10 @@ function setupSaveProgress(itemData) {
     // Guarda os dados do filme atual na variável global quando abre o player
     currentVideoContext = itemData;
 
-    // Se for série, mostra inputs de temp/ep. Se filme, esconde.
+    // Se for série ou anime, mostra inputs de temp/ep. Se filme, esconde.
     const serieInputs = document.getElementById('serie-inputs');
     if (serieInputs) {
-        serieInputs.style.display = (itemData.type === 'tv') ? 'flex' : 'none';
+        serieInputs.style.display = (itemData.type === 'tv' || itemData.type === 'anime') ? 'flex' : 'none';
     }
 
     // Tenta preencher os inputs se já tiver progresso salvo antes no Firestore
@@ -2128,14 +2244,14 @@ function setupSaveProgress(itemData) {
         if (saved) {
             document.getElementById('stop-hour').value = saved.progress.h || 0;
             document.getElementById('stop-min').value = saved.progress.m || 0;
-            if (itemData.type === 'tv') {
+            if (itemData.type === 'tv' || itemData.type === 'anime') {
                 document.getElementById('current-season').value = saved.progress.s || 1;
                 document.getElementById('current-episode').value = saved.progress.ep || 1;
             }
         } else {
             document.getElementById('stop-hour').value = '';
             document.getElementById('stop-min').value = '';
-            if (itemData.type === 'tv') {
+            if (itemData.type === 'tv' || itemData.type === 'anime') {
                 document.getElementById('current-season').value = 1;
                 document.getElementById('current-episode').value = 1;
             }
@@ -2143,7 +2259,7 @@ function setupSaveProgress(itemData) {
     } else {
         document.getElementById('stop-hour').value = '';
         document.getElementById('stop-min').value = '';
-        if (itemData.type === 'tv') {
+        if (itemData.type === 'tv' || itemData.type === 'anime') {
             document.getElementById('current-season').value = 1;
             document.getElementById('current-episode').value = 1;
         }
@@ -2343,6 +2459,15 @@ function initSaveButton() {
 
         saveUserDataToCloud();
         showToast("Progresso salvo na nuvem!", "success");
+
+        // Fecha o modal do player de vídeo automaticamente
+        const modal = document.getElementById('video-modal');
+        const iframe = document.getElementById('video-iframe');
+        if (modal && iframe) {
+            modal.classList.remove('show');
+            iframe.src = '';
+        }
+
         loadContinueWatching();
     };
 }
@@ -2371,7 +2496,7 @@ function loadContinueWatching() {
         const h = parseInt(item.progress.h) || 0;
         const m = parseInt(item.progress.m) || 0;
         const progMin = (h * 60) + m;
-        const duracaoEstimada = item.type === 'tv' ? 45 : 120;
+        const duracaoEstimada = (item.type === 'tv' || item.type === 'anime') ? 45 : 120;
         let pct = Math.min(Math.max(Math.round((progMin / duracaoEstimada) * 100), 15), 90);
         
         return `
@@ -2381,7 +2506,7 @@ function loadContinueWatching() {
                 <img src="${item.poster}" loading="lazy">
                 <div class="history-progress-overlay">
                     <span class="history-time-info">
-                        ${item.type === 'tv' ? `T${item.progress.s} EP${item.progress.ep} • ` : ''}${h > 0 ? `${h}h ` : ''}${m}m
+                        ${(item.type === 'tv' || item.type === 'anime') ? `T${item.progress.s} EP${item.progress.ep} • ` : ''}${h > 0 ? `${h}h ` : ''}${m}m
                     </span>
                     <div class="history-progress-track">
                         <div class="history-progress-bar" style="width: ${pct}%;"></div>
@@ -2824,12 +2949,20 @@ const BryIA = {
         else if (window.location.pathname.includes('minha-lista')) contextoPagina = "O usuário está na 'Minha Lista'.";
 
         const historyForGemini = this.chatHistory
-            .filter(msg => msg.type !== 'card')
-            .slice(-12)
-            .map(msg => ({
-                role: msg.role === 'bot' ? 'model' : 'user',
-                parts: [{ text: msg.text }]
-            }));
+            .slice(-16) // Janela de contexto estendida para 16 mensagens para incluir cards e falas
+            .map(msg => {
+                let textContent = msg.text || "";
+                if (msg.type === 'card' && msg.data) {
+                    const title = msg.data.title || msg.data.name || "Obra";
+                    const year = (msg.data.release_date || msg.data.first_air_date || "????").substring(0, 4);
+                    textContent = `[Sistema: Card de assistir exibido na tela para a obra: "${title} (${year})"]`;
+                }
+                return {
+                    role: msg.role === 'bot' ? 'model' : 'user',
+                    parts: [{ text: textContent }]
+                };
+            })
+            .filter(msg => msg.parts[0].text.trim() !== "");
 
         // --- INJEÇÃO INVISÍVEL À PROVA DE FALHAS (CORREÇÃO DE TAGS E RECOMENDAÇÕES) ---
         if (historyForGemini.length > 0 && historyForGemini[historyForGemini.length - 1].role === 'user') {
@@ -2857,6 +2990,12 @@ const BryIA = {
         Exemplos de formato obrigatório:
         - Usuário: "filmes de terror da galáxia" -> Resposta: "Aqui estão excelentes opções de terror no espaço para você se arrepiar! 🌌🛸🍿\n1. [BUSCA:Alien, o Oitavo Passageiro 1979] - O clássico absoluto do terror espacial.\n2. [BUSCA:O Enigma do Horizonte 1997] - Uma viagem perturbadora rumo ao inferno na galáxia.\n3. [BUSCA:Pandorum 2009] - Sobrevivência e loucura a bordo de uma espaçonave gigante."
         - Usuário: "Qual o top 3 do Ghibli?" -> Resposta: "O Studio Ghibli é maravilhoso! 🌌✨ Aqui estão as 3 maiores obras-primas:\n1. [BUSCA:A Viagem de Chihiro 2001] - Uma fantástica jornada espiritual.\n2. [BUSCA:Meu Amigo Totoro 1988] - Um clássico doce e poético.\n3. [BUSCA:O Castelo Animado 2004] - Uma magia deslumbrante."
+        
+        ⚠️ MEMÓRIA DE CARDS NA TELA (MUITO IMPORTANTE):
+        - No histórico da conversação, você receberá mensagens do sistema no formato: "[Sistema: Card de assistir exibido na tela para a obra: 'Nome (Ano)']".
+        - Isso significa que você já enviou o card interativo com capa e botão de assistir para o usuário na tela do chat!
+        - Utilize essa informação para manter o contexto cinéfilo perfeito da conversa. Por exemplo, se o usuário disser "gostei do primeiro" ou "quero ver o segundo", você saberá exatamente qual filme foi exibido nos cards anteriores baseando-se no histórico de cards na tela!
+        - Lembre-se sempre de que sua missão principal é exibir cards interativos de filmes de forma proativa no chat.
         
         Contexto atual da página: ${contextoPagina}
         `;
@@ -2893,21 +3032,58 @@ const BryIA = {
 
     async processResponse(text) {
         const searchRegex = /\[BUSCA:(.*?)\]/g;
-        let formattedText = text.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(searchRegex, "<b>$1</b>");
+        const termos = new Set();
         
-        // Cria a mensagem de texto da IA e captura a div correspondente
-        const messageEl = this.appendMsg(formattedText, 'bot', true);
-
-        searchRegex.lastIndex = 0;
+        // 1. Captura termos com a tag explícita [BUSCA:...]
         let match;
-        const promessas = [];
+        searchRegex.lastIndex = 0;
         while ((match = searchRegex.exec(text)) !== null) {
             const termo = match[1].trim();
-            if (termo) {
-                // Passa a div da mensagem para que o card seja acoplado dentro dela
-                promessas.push(this.searchAndCreateCard(termo, true, messageEl));
+            if (termo) termos.add(termo);
+        }
+
+        // 2. Fallbacks Inteligentes: captura menções se o modelo de linguagem esquecer a tag
+        // Fallback A: Negrito seguido de Ano, ex: **Titanic** (1997)
+        const negritoAnoRegex = /\*\*([^*]+?)\*\*\s*\((\d{4})\)/g;
+        let negritoMatch;
+        negritoAnoRegex.lastIndex = 0;
+        while ((negritoMatch = negritoAnoRegex.exec(text)) !== null) {
+            const nome = negritoMatch[1].trim();
+            const ano = negritoMatch[2].trim();
+            if (nome && nome.length > 1 && nome.length < 60) {
+                termos.add(`${nome} ${ano}`);
             }
         }
+
+        // Fallback B: Lista Numerada com Negrito, ex: "1. **Inception** (2010)" ou "1. **Inception**"
+        const listaNegritoRegex = /(?:\d+\.\s+)\*\*([^*]+?)\*\*/g;
+        let listaMatch;
+        listaNegritoRegex.lastIndex = 0;
+        while ((listaMatch = listaNegritoRegex.exec(text)) !== null) {
+            const nome = listaMatch[1].trim();
+            if (nome && nome.length > 1 && nome.length < 60) {
+                const trecho = text.substring(listaMatch.index, listaMatch.index + 100);
+                const anoMatch = trecho.match(/\((\d{4})\)/);
+                if (anoMatch) {
+                    termos.add(`${nome} ${anoMatch[1]}`);
+                } else {
+                    termos.add(nome);
+                }
+            }
+        }
+
+        // Formata o texto final com quebras de linha e negritos para renderização no balão
+        let formattedText = text.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(searchRegex, "<b>$1</b>");
+        
+        // Cria o balão de texto da IA e captura a div correspondente
+        const messageEl = this.appendMsg(formattedText, 'bot', true);
+
+        // Realiza as requisições em paralelo no TMDB e monta os cards proativos
+        const promessas = [];
+        termos.forEach(termo => {
+            promessas.push(this.searchAndCreateCard(termo, true, messageEl));
+        });
+
         if (promessas.length > 0) {
             await Promise.all(promessas);
         }
@@ -3513,3 +3689,146 @@ window.showFamousWorks = async function(personId, personName) {
         showToast("Erro ao buscar produções do famoso.", "error");
     }
 };
+
+// =================================================================
+// 🔞 EASTER EGG: MULTIVERSO ADULTO (30 CLIQUES EM INÍCIO)
+// =================================================================
+function initEasterEgg() {
+    document.addEventListener('click', (e) => {
+        // Intercepta cliques no botão de mudar tema (alternar cor do site)
+        const toggleBtn = e.target.closest('#theme-toggle');
+        if (toggleBtn) {
+            let clicks = parseInt(localStorage.getItem('winbry_ee_clicks')) || 0;
+            clicks++;
+            localStorage.setItem('winbry_ee_clicks', clicks);
+            console.log(`🥚 Clicks Easter Egg (Tema): ${clicks}/20`);
+
+            if (clicks >= 20) {
+                // Zera o contador
+                localStorage.setItem('winbry_ee_clicks', '0');
+                // Dispara o Multiverso Adulto Secreto!
+                window.location.href = 'filmes.html?easteregg=true';
+            }
+        }
+    });
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initEasterEgg);
+} else {
+    initEasterEgg();
+}
+
+async function loadAdultEasterEgg(page) {
+    currentPage = page;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    showToast("🔞 Carregando o Multiverso Adulto Secreto (18+)...", "info");
+
+    // 1. IDs estáticos consagrados (Garantia de carregamento dos melhores clássicos)
+    const staticObras = [
+        { id: 98042, type: 'tv' },      // Overflow (Anime Hentai)
+        { id: 112836, type: 'tv' },     // Redo of Healer (Anime Adulto)
+        { id: 43406, type: 'tv' },      // Yosuga no Sora (Anime Adulto)
+        { id: 64188, type: 'tv' },      // Valkyrie Drive: Mermaid (Anime Adulto)
+        { id: 324291, type: 'movie' },  // Love (Filme Adulto Gaspar Noé)
+        { id: 635302, type: 'movie' },  // 365 Dias (Filme Adulto / Erótico)
+        { id: 216015, type: 'movie' },  // Cinquenta Tons de Cinza (Erótico)
+        { id: 190859, type: 'movie' },  // Ninfomaníaca: Volume 1 (Erótico)
+        { id: 242095, type: 'movie' },  // Ninfomaníaca: Volume 2 (Erótico)
+        { id: 85341, type: 'tv' },      // Domestic Girlfriend (Anime Adulto)
+        { id: 32976, type: 'tv' },      // Kiss x Sis (Anime Adulto)
+        { id: 345, type: 'movie' },     // De Olhos Bem Fechados (Clássico Erótico)
+        { id: 402, type: 'movie' },     // Instinto Selvagem (Clássico Erótico)
+        { id: 5822, type: 'movie' },    // Império dos Sentidos (Erótico)
+        { id: 100412, type: 'tv' },     // Kuroinu: Kedamono-tachi no Moriawase (Hentai Famoso)
+        { id: 115222, type: 'tv' }      // Harem in the Labyrinth of Another World (Anime Adulto)
+    ];
+
+    try {
+        // 2. Dispara a busca síncrona/paralela dos clássicos estáticos
+        const staticPromises = staticObras.map(async (obra) => {
+            try {
+                const data = await fetchTMDB(`/${obra.type}/${obra.id}`);
+                if (data && data.poster_path) {
+                    data.media_type = obra.type;
+                    return data;
+                }
+            } catch (e) {
+                console.error(`Erro ao obter obra estática ${obra.id}:`, e);
+            }
+            return null;
+        });
+
+        // 3. Dispara buscas dinâmicas no TMDB por todos os termos adultos, de hentai e pornô solicitados
+        const searchTerms = [
+            'hentai', 'uncensored', 'erotic', 'erótica', 'erótico', 'sexy anime', 
+            'adult anime', 'ecchi', 'orgasm', 'sex', 'sexual', 'sadomaso', 
+            'blowjob', 'creampie', 'sensual', 'yuri', 'yaoi', 'hentai anime',
+            'overflow', 'yosuga no sora', 'boku no pico', 'kiss x sis', 'valkyrie drive', 
+            'redo of healer', 'kaifuku jutsushi', 'ishuzoku reviewers', 'shoujo ramune',
+            'residence', 'front inn', 'under-content', 'kuroinu', 'disciplined',
+            'overflow: tenkousei', 'overflowing',
+            'porn', 'pornography', 'pornstar', 'hardcore', 'softcore', 'xxx', 'sex movie', 'erotic movie', 'erotismo'
+        ];
+        const dynamicPromises = [];
+
+        searchTerms.forEach(term => {
+            // Busca multi (filmes, séries e animes juntos) para otimização extrema e velocidade
+            dynamicPromises.push(fetchTMDB(`/search/multi?query=${encodeURIComponent(term)}&include_adult=true&page=1`));
+        });
+
+        // Discover de Animes Adultos adicionais para entupir a lista
+        dynamicPromises.push(fetchTMDB('/discover/tv?with_genres=16&with_original_language=ja&sort_by=popularity.desc&include_adult=true&page=1'));
+        dynamicPromises.push(fetchTMDB('/discover/tv?with_genres=16&with_original_language=ja&sort_by=popularity.desc&include_adult=true&page=2'));
+
+        // Discover de Filmes Adultos Reais (Pornô e Eróticos de Carne e Osso 18+ do TMDB)
+        dynamicPromises.push(fetchTMDB('/discover/movie?include_adult=true&sort_by=popularity.desc&page=1'));
+        dynamicPromises.push(fetchTMDB('/discover/movie?include_adult=true&sort_by=popularity.desc&page=2'));
+        dynamicPromises.push(fetchTMDB('/discover/movie?include_adult=true&sort_by=popularity.desc&page=3'));
+
+        // Resolve tudo de forma ultrarrápida em paralelo
+        const [staticResults, ...dynamicResults] = await Promise.all([
+            Promise.all(staticPromises),
+            ...dynamicPromises
+        ]);
+
+        // Junta todos os itens em uma lista única
+        let allItems = [...staticResults.filter(r => r !== null)];
+
+        dynamicResults.forEach((res) => {
+            if (res && res.results) {
+                res.results.forEach(item => {
+                    if (item.poster_path && (item.media_type === 'movie' || item.media_type === 'tv')) {
+                        allItems.push(item);
+                    }
+                });
+            }
+        });
+
+        // 4. Filtra duplicados pelo ID do TMDB de forma eficiente com Set
+        const seenIds = new Set();
+        let uniqueAdultItems = [];
+        allItems.forEach(item => {
+            if (item && item.id && !seenIds.has(item.id)) {
+                seenIds.add(item.id);
+                uniqueAdultItems.push(item);
+            }
+        });
+
+        // 5. Ordena por popularidade para destacar os melhores no topo
+        uniqueAdultItems.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+
+        if (uniqueAdultItems.length > 0) {
+            // Renderiza a grande grade dinâmica adulta com sucesso absoluto!
+            renderGrid(uniqueAdultItems, 'multi', '🔞 Multiverso Adulto Secreto (18+)');
+            renderPagination(1, 1, null); // Exibe tudo em página única contínua premium
+        } else {
+            showToast("⚠️ Não foi possível carregar o catálogo secreto. Tente novamente.", "error");
+        }
+
+    } catch (error) {
+        console.error("Erro geral no Multiverso Adulto:", error);
+        showToast("⚠️ Erro ao carregar o Multiverso Adulto.", "error");
+    }
+}
