@@ -143,7 +143,10 @@
             <h2>Diário de Resenhas</h2>
             <p>Compartilhe sua opinião sobre as produções que assistiu no WinBry.</p>
           </div>
-          <button id="btn-open-review-form" class="btn btn-primary"><i class="fas fa-plus"></i> Escrever Resenha</button>
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <button id="btn-share-profile-reviews" class="btn btn-compartilhar" style="padding: 10px 20px !important;"><i class="fas fa-share-alt"></i> Compartilhar Resenhas</button>
+            <button id="btn-open-review-form" class="btn btn-primary"><i class="fas fa-plus"></i> Escrever Resenha</button>
+          </div>
         </div>
 
         <!-- Listagem dinâmica de resenhas do usuário -->
@@ -279,18 +282,24 @@
           </div>
         </div>
 
-        <!-- Etapa 2: Estrelas Interativas (0.5 a 5.0) -->
+        <!-- Etapa 2: Estrelas Interativas (0 a 10) -->
         <div class="form-group" style="margin-top:20px;">
-          <label>Sua Nota (0.5 a 5.0 estrelas)</label>
-          <div class="rating-stars-wrapper" style="display:flex; align-items:center; gap:15px; margin-top:5px;">
-            <div class="star-rating-interactive" id="star-rating-interactive" style="display:flex; gap:5px; font-size:2rem; color:#ffd700; cursor:pointer;">
-              <i class="far fa-star" data-index="1" style="position:relative;"></i>
-              <i class="far fa-star" data-index="2" style="position:relative;"></i>
-              <i class="far fa-star" data-index="3" style="position:relative;"></i>
-              <i class="far fa-star" data-index="4" style="position:relative;"></i>
-              <i class="far fa-star" data-index="5" style="position:relative;"></i>
+          <label>Sua Nota (0 a 10 estrelas)</label>
+          <div class="rating-stars-wrapper" style="display:flex; align-items:center; gap:12px; margin-top:5px; flex-wrap:wrap;">
+            <div class="star-rating-interactive" id="star-rating-interactive" style="display:flex; gap:3px; font-size:1.35rem; color:#ffd700; cursor:pointer; flex-wrap:wrap;">
+              <i class="far fa-star" data-index="1"></i>
+              <i class="far fa-star" data-index="2"></i>
+              <i class="far fa-star" data-index="3"></i>
+              <i class="far fa-star" data-index="4"></i>
+              <i class="far fa-star" data-index="5"></i>
+              <i class="far fa-star" data-index="6"></i>
+              <i class="far fa-star" data-index="7"></i>
+              <i class="far fa-star" data-index="8"></i>
+              <i class="far fa-star" data-index="9"></i>
+              <i class="far fa-star" data-index="10"></i>
             </div>
-            <span id="rating-display-value" class="rating-display-value" style="font-size:1.1rem; font-weight:bold; color:#ff4444; background:rgba(255,255,255,0.05); padding:4px 10px; border-radius:4px;">Sem Nota</span>
+            <span id="rating-display-value" class="rating-display-value" style="font-size:1rem; font-weight:bold; color:#ff4444; background:rgba(255,255,255,0.05); padding:4px 10px; border-radius:4px; min-width:80px; text-align:center;">0.0 Estrelas</span>
+            <button type="button" id="btn-zero-rating" class="btn btn-ghost" style="padding: 4px 10px !important; font-size: 0.75rem; height: auto; border: 1px dashed rgba(255,255,255,0.15); display: flex; align-items: center; gap: 5px; color: #888; background: transparent;"><i class="fas fa-ban"></i> 0 Estrelas</button>
             <input type="hidden" id="review-rating-val" value="0">
           </div>
         </div>
@@ -328,7 +337,7 @@
   <div id="video-modal" class="video-modal">
     <div class="video-modal-content">
       <span id="close-player" class="close-btn">&times;</span>
-      <iframe id="video-iframe" width="100%" height="100%" src="" frameborder="0" allow="autoplay; encrypted-media"
+      <iframe id="video-iframe" width="100%" height="100%" src="" frameborder="0" allow="autoplay; encrypted-media; picture-in-picture"
         allowfullscreen></iframe>
     </div>
   </div>

@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WinBry | Perfil Cinéfilo</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/core-js/3.32.1/minified.js"></script>
+  <link rel="icon" href="images/favicon.png" />
+  <link rel="stylesheet" href="style.css?v=2026.05.22.4" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+  <link rel="manifest" href="/manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#e50914">
+  
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+  <style>
+    /* Estilos Premium e Customizados para o Perfil Público */
+    .profile-public-wrapper {
+      max-width: 1200px;
+      margin: 110px auto 40px; /* Desloca abaixo da navbar no desktop */
+      padding: 0 20px 100px;
+      display: grid;
+      grid-template-columns: 350px 1fr;
+      gap: 40px;
+      animation: fadeInUp 0.6s ease-out;
+    }
+
+    @media (max-width: 992px) {
+      .profile-public-wrapper {
+        grid-template-columns: 1fr;
+        margin: 90px auto 40px; /* Desloca abaixo da navbar no mobile */
+        gap: 30px;
+      }
+    }
+
+    /* Card Lateral do Usuário */
+    .profile-public-sidebar {
+      background: rgba(26, 26, 26, 0.45);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 20px;
+      padding: 40px 30px;
+      text-align: center;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
+      height: fit-content;
+      position: sticky;
+      top: 100px;
+    }
+
+    @media (max-width: 992px) {
+      .profile-public-sidebar {
+        position: relative;
+        top: 0;
+      }
+    }
+
+    .public-avatar-wrapper {
+      width: 150px;
+      height: 150px;
+      border-radius: 50%;
+      margin: 0 auto 25px;
+      overflow: hidden;
+      border: 3px solid #e50914;
+      box-shadow: 0 0 25px rgba(229, 9, 20, 0.3);
+      background: #141414;
+      position: relative;
+    }
+
+    .public-avatar-wrapper img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .profile-public-sidebar h2 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 8px;
+      word-break: break-all;
+    }
+
+    .profile-public-sidebar .cinephile-tag {
+      display: inline-block;
+      background: linear-gradient(135deg, #e50914, #ff5e62);
+      color: #fff;
+      font-size: 0.75rem;
+      font-weight: bold;
+      text-transform: uppercase;
+      padding: 5px 15px;
+      border-radius: 50px;
+      margin-bottom: 30px;
+      letter-spacing: 1px;
+      box-shadow: 0 5px 15px rgba(229, 9, 20, 0.3);
+    }
+
+    .public-stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+      margin-bottom: 30px;
+    }
+
+    .public-stat-item {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      border-radius: 12px;
+      padding: 15px 10px;
+      transition: all 0.3s ease;
+    }
+
+    .public-stat-item:hover {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: rgba(229, 9, 20, 0.3);
+      transform: translateY(-2px);
+    }
+
+    .public-stat-item i {
+      font-size: 1.3rem;
+      color: #e50914;
+      margin-bottom: 8px;
+    }
+
+    .public-stat-val {
+      display: block;
+      font-size: 1.4rem;
+      font-weight: 800;
+      color: #fff;
+    }
+
+    .public-stat-lbl {
+      display: block;
+      font-size: 0.72rem;
+      color: #aaa;
+      text-transform: uppercase;
+      margin-top: 3px;
+      font-weight: 600;
+    }
+
+    /* CTA para Visitantes */
+    .public-cta-card {
+      background: linear-gradient(135deg, rgba(229, 9, 20, 0.15), rgba(255, 94, 98, 0.05));
+      border: 1px solid rgba(229, 9, 20, 0.3);
+      border-radius: 15px;
+      padding: 25px;
+      margin-top: 30px;
+      text-align: center;
+    }
+
+    .public-cta-card h4 {
+      font-size: 1rem;
+      color: #fff;
+      margin-bottom: 10px;
+      font-weight: 600;
+    }
+
+    .public-cta-card p {
+      font-size: 0.8rem;
+      color: #ccc;
+      margin-bottom: 15px;
+      line-height: 1.4;
+    }
+
+    /* Feed de Resenhas */
+    .profile-public-feed h1 {
+      font-size: 2.2rem;
+      font-weight: 800;
+      margin-bottom: 10px;
+      background: linear-gradient(to right, #fff, #888);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .profile-public-feed .feed-subtitle {
+      font-size: 1rem;
+      color: #888;
+      margin-bottom: 40px;
+    }
+
+    .public-reviews-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 25px;
+    }
+
+    .public-review-card {
+      background: rgba(26, 26, 26, 0.45);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 16px;
+      display: grid;
+      grid-template-columns: 120px 1fr;
+      gap: 25px;
+      padding: 25px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .public-review-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(255, 255, 255, 0.1);
+      box-shadow: 0 15px 40px rgba(0, 0, 0, 0.4);
+    }
+
+    @media (max-width: 576px) {
+      .public-review-card {
+        grid-template-columns: 1fr !important;
+        gap: 20px;
+        padding: 20px;
+      }
+      .public-avatar-wrapper {
+        width: 120px;
+        height: 120px;
+      }
+      .profile-public-sidebar h2 {
+        font-size: 1.5rem;
+      }
+      .profile-public-sidebar {
+        padding: 25px 20px;
+      }
+      .public-review-poster {
+        width: 100px;
+        height: 150px;
+        margin: 0 auto; /* Centraliza poster no mobile */
+      }
+      .public-review-info {
+        text-align: left;
+      }
+    }
+
+    .public-review-poster {
+      width: 120px;
+      height: 180px;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+      background: #141414;
+    }
+
+    .public-review-poster img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 0.5s ease;
+    }
+
+    .public-review-card:hover .public-review-poster img {
+      transform: scale(1.06);
+    }
+
+    .public-review-info {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .public-review-movie-title {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 8px;
+    }
+
+    .public-review-rating-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 15px;
+      flex-wrap: wrap;
+    }
+
+    .public-review-stars {
+      color: #ffd700;
+      font-size: 0.95rem;
+      display: flex;
+      gap: 2px;
+    }
+
+    .public-review-rating-val {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #ff4444;
+      background: rgba(255, 68, 68, 0.08);
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+
+    .public-review-date {
+      font-size: 0.8rem;
+      color: #666;
+      font-weight: 500;
+    }
+
+    .public-review-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #eee;
+      margin-bottom: 10px;
+      font-style: italic;
+    }
+
+    .public-review-body {
+      font-size: 0.92rem;
+      color: #bbb;
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+
+    /* Loader */
+    .profile-loader {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 100px 20px;
+      color: #fff;
+    }
+
+    .profile-loader i {
+      font-size: 3rem;
+      color: #e50914;
+      margin-bottom: 20px;
+      animation: spin 1s linear infinite;
+    }
+
+    /* Empty/Error States */
+    .profile-error-state {
+      max-width: 500px;
+      margin: 80px auto;
+      padding: 40px 30px;
+      text-align: center;
+      background: rgba(26, 26, 26, 0.45);
+      border: 1px dashed rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      backdrop-filter: blur(20px);
+    }
+
+    .profile-error-state i {
+      font-size: 4rem;
+      color: #e50914;
+      margin-bottom: 20px;
+    }
+
+    .profile-error-state h3 {
+      font-size: 1.5rem;
+      color: #fff;
+      margin-bottom: 12px;
+    }
+
+    .profile-error-state p {
+      color: #888;
+      font-size: 0.95rem;
+      line-height: 1.5;
+      margin-bottom: 25px;
+    }
+
+    @keyframes spin {
+      100% { transform: rotate(360deg); }
+    }
+    
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+  </style>
+</head>
+
+<body class="dark-mode">
+  <header>
+    <div class="container">
+      <div class="logo">
+        <a class="btn-log" href="index.html">WinBry</a>
+      </div>
+      <nav class="main-nav">
+        <ul>
+          <li><a href="index.html">Início</a></li>
+          <li><a href="filmes.html">Filmes</a></li>
+          <li><a href="series.html">Séries</a></li>
+          <li><a href="animes.html">Animes</a></li>
+          <li><a href="aplicativos.html">Baixar</a></li>
+        </ul>
+      </nav>
+      <div class="user-actions">
+        <a id="theme-toggle" class="icon-btn"><i class="fas fa-sun"></i></a>
+        <a href="formulario.html" class="icon-btn"><i class="fas fa-comments"></i></a>
+        <a href="minha-lista.html" class="icon-btn"><i class="fas fa-bookmark"></i></a>
+        <a id="user-action" href="login.html" class="btn btn-primary">Entrar</a>
+      </div>
+      <button class="menu-toggle"><i class="fas fa-bars"></i></button>
+    </div>
+  </header>
+
+  <!-- Container de Carregamento Principal -->
+  <div id="public-profile-container">
+    <div class="profile-loader">
+      <i class="fas fa-spinner"></i>
+      <h3>Carregando diário de resenhas...</h3>
+      <p>Buscando conexões seguras com o Firestore</p>
+    </div>
+  </div>
+
+  <footer>
+    <div class="container">
+      <p>&copy; 2026 WinBry | Todos os direitos reservados.</p>
+      <div class="social-links">
+        <a href="#"><i class="fab fa-facebook-f"></i></a>
+        <a href="#"><i class="fab fa-twitter"></i></a>
+        <a href="#"><i class="fab fa-instagram"></i></a>
+      </div>
+    </div>
+  </footer>
+
+  <nav class="bottom-nav">
+    <a href="index.html" class="nav-item">
+      <i class="fas fa-home"></i>
+      <span>Início</span>
+    </a>
+    <a href="filmes.html" class="nav-item">
+      <i class="fas fa-film"></i>
+      <span>Filmes</span>
+    </a>
+    <a href="series.html" class="nav-item">
+      <i class="fas fa-tv"></i>
+      <span>Séries</span>
+    </a>
+    <a href="animes.html" class="nav-item">
+      <i class="fas fa-dragon"></i>
+      <span>Animes</span>
+    </a>
+    <a href="aplicativos.html" class="nav-item">
+      <i class="fas fa-mobile-alt"></i>
+      <span>Baixar</span>
+    </a>
+    <a href="formulario.html" class="nav-item">
+      <i class="fas fa-comments"></i>
+      <span>Pedir</span>
+    </a>
+  </nav>
+
+  <!-- Lógica Javascript dedicada ao Perfil Público -->
+  <script>
+    // Configurações do Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyAL4eejSiJU7xhg7etuydqlEGq5fGP9hMU",
+      authDomain: "winbryplus.firebaseapp.com",
+      projectId: "winbryplus",
+      storageBucket: "winbryplus.firebasestorage.app",
+      messagingSenderId: "754571772845",
+      appId: "1:754571772845:web:ab12c0697aa14f35bc1724"
+    };
+
+    // Inicialização do Firebase
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+    const db = firebase.firestore();
+    const auth = firebase.auth();
+
+    // Carrega cabeçalho e menu móvel
+    document.addEventListener('DOMContentLoaded', () => {
+      // Menu móvel
+      const btn = document.querySelector('.menu-toggle');
+      const nav = document.querySelector('.main-nav ul');
+      if (btn && nav) btn.onclick = () => nav.classList.toggle('active');
+
+      // Tema
+      const toggle = document.getElementById('theme-toggle');
+      if (toggle) {
+        toggle.onclick = () => {
+          document.body.classList.toggle('light-mode');
+          localStorage.setItem('theme', document.body.classList.contains('light-mode') ? 'light' : 'dark');
+        };
+      }
+      if (localStorage.getItem('theme') === 'light') {
+        document.body.classList.add('light-mode');
+      }
+
+      // Torna os botões de ação e perfil no header visíveis
+      const userActions = document.querySelector('.user-actions');
+      if (userActions) {
+        setTimeout(() => {
+          userActions.style.opacity = '1';
+          userActions.style.visibility = 'visible';
+        }, 100);
+      }
+
+      // Verifica status de Login do usuário corrente para o header e CTA
+      auth.onAuthStateChanged(async user => {
+        const userAction = document.getElementById('user-action');
+        if (userAction) {
+          if (user) {
+            const userName = user.displayName ? user.displayName.split(' ')[0] : 'Perfil';
+            let userImg = user.photoURL || 'images/foto-generica.jpg';
+
+            // Busca foto de perfil personalizada do banco Firestore se houver
+            try {
+              const uDoc = await db.collection('users').doc(user.uid).get();
+              if (uDoc.exists && uDoc.data().profileImage) {
+                userImg = uDoc.data().profileImage;
+              }
+            } catch (err) {
+              console.log("Erro ao recuperar foto do Firestore para o header:", err);
+            }
+
+            userAction.innerHTML = `<img src="${userImg}" style="width:28px;height:28px;border-radius:50%;margin-right:8px;object-fit:cover;"> ${userName}`;
+            userAction.href = 'minha-conta.html';
+            userAction.classList.remove('btn-primary');
+            userAction.style.display = 'flex';
+            userAction.style.alignItems = 'center';
+          } else {
+            userAction.innerHTML = 'Entrar';
+            userAction.href = 'login.html';
+            userAction.classList.add('btn-primary');
+            userAction.style.display = '';
+          }
+        }
+
+        // Atualiza dinamicamente o card de CTA se o estado de login mudar
+        const ctaCard = document.querySelector('.public-cta-card');
+        if (ctaCard) {
+          if (user) {
+            ctaCard.innerHTML = `
+              <h4>Você já faz parte! 🎉</h4>
+              <p>Que tal escrever novas resenhas e atualizar seu diário cinéfilo no WinBry?</p>
+              <a href="minha-conta.html" class="btn btn-primary" style="display:block; padding:12px; font-size:0.9rem;">Ir para Minha Conta</a>
+            `;
+          } else {
+            ctaCard.innerHTML = `
+              <h4>Escreva você também!</h4>
+              <p>Crie sua estante de cinema, avalie suas produções favoritas e use a nossa inteligência artificial integrada!</p>
+              <a href="cadastro.html" class="btn btn-primary" style="display:block; padding:12px; font-size:0.9rem;">Criar Minha Conta</a>
+            `;
+          }
+        }
+      });
+
+      // Roda carga principal do Perfil
+      loadPublicProfile();
+    });
+
+    // Alterna o texto de "Ver mais" / "Ver menos" de resenhas longas
+    window.toggleReadMore = function(btn) {
+      const container = btn.parentNode;
+      const shortText = container.querySelector('.review-short-text');
+      const fullText = container.querySelector('.review-full-text');
+      if (shortText && fullText) {
+        if (shortText.style.display === 'none') {
+          shortText.style.display = 'inline';
+          fullText.style.display = 'none';
+          btn.innerText = 'Ver mais';
+        } else {
+          shortText.style.display = 'none';
+          fullText.style.display = 'inline';
+          btn.innerText = 'Ver menos';
+        }
+      }
+    };
+
+    // Gera o HTML das Estrelas (10 estrelas inteiras)
+    function generateStarsHTML(rating) {
+      let html = '';
+      for (let i = 1; i <= 10; i++) {
+        if (i <= Math.floor(rating)) {
+          html += '<i class="fas fa-star" style="font-size: 0.72rem; margin-right: 1px; color: #ffd700;"></i>';
+        } else {
+          html += '<i class="far fa-star" style="font-size: 0.72rem; margin-right: 1px; color: rgba(255,255,255,0.15);"></i>';
+        }
+      }
+      return html;
+    }
+
+    // Carrega Perfil Público
+    async function loadPublicProfile() {
+      const container = document.getElementById('public-profile-container');
+      const urlParams = new URLSearchParams(window.location.search);
+      const uid = urlParams.get('uid');
+
+      if (!uid) {
+        container.innerHTML = `
+          <div class="profile-error-state">
+            <i class="fas fa-exclamation-triangle"></i>
+            <h3>Link Inválido</h3>
+            <p>Este link de compartilhamento de resenhas está quebrado ou incompleto. Certifique-se de copiar o link completo.</p>
+            <a href="index.html" class="btn btn-primary">Voltar para a Home</a>
+          </div>
+        `;
+        return;
+      }
+
+      try {
+        const userDoc = await db.collection('users').doc(uid).get();
+
+        if (!userDoc.exists) {
+          container.innerHTML = `
+            <div class="profile-error-state">
+              <i class="fas fa-user-slash"></i>
+              <h3>Perfil Não Encontrado</h3>
+              <p>O cinéfilo proprietário deste diário não existe ou desativou sua conta recentemente.</p>
+              <a href="index.html" class="btn btn-primary">Voltar para a Home</a>
+            </div>
+          `;
+          return;
+        }
+
+        const data = userDoc.data();
+        const username = data.username || "Usuário do WinBry";
+        const profileImage = data.profileImage || 'images/foto-generica.jpg';
+        const reviews = data.reviews || [];
+        const favoritos = data.favoritos || [];
+
+        // Atualiza título da página com o nome do usuário
+        document.title = `Diário Cinéfilo de ${username} | WinBry`;
+
+        // Calcula estatísticas
+        const reviewsCount = reviews.length;
+        let averageRating = "0.0";
+        if (reviewsCount > 0) {
+          const sum = reviews.reduce((acc, curr) => acc + curr.rating, 0);
+          averageRating = (sum / reviewsCount).toFixed(1);
+        }
+        const favoritesCount = favoritos.length;
+
+        // Renderiza Sidebar + Grid de Reviews
+        let reviewsHtml = '';
+        if (reviewsCount === 0) {
+          reviewsHtml = `
+            <div class="profile-error-state" style="margin: 0; width: 100%;">
+              <i class="fas fa-comment-slash"></i>
+              <h3>Estante de resenhas vazia</h3>
+              <p>Este usuário ainda não escreveu nenhuma resenha. Volte mais tarde!</p>
+            </div>
+          `;
+        } else {
+          // Ordena reviews por data de criação mais recente
+          const sortedReviews = [...reviews].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+          reviewsHtml = `
+            <div class="public-reviews-grid">
+              ${sortedReviews.map(review => {
+                const stars = generateStarsHTML(review.rating);
+                const date = new Date(review.createdAt);
+                const dateStr = date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                
+                const isLong = review.reviewBody && review.reviewBody.length > 280;
+                const bodyHtml = isLong ? `<span class="review-short-text">${review.reviewBody.substring(0, 260)}...</span><span class="review-full-text" style="display:none;">${review.reviewBody}</span> <button type="button" class="btn-read-more" onclick="toggleReadMore(this)" style="background:none; border:none; color:#e50914; font-weight:bold; cursor:pointer; padding:0; font-size:0.82rem; display:inline; outline:none; text-transform:uppercase; letter-spacing:0.5px; margin-left:5px;">Ver mais</button>` : `<span>${review.reviewBody || ''}</span>`;
+                
+                return `
+                  <div class="public-review-card">
+                    <div class="public-review-poster">
+                      <img src="${review.moviePoster}" alt="${review.movieTitle}" onerror="this.src='images/favicon.png'">
+                    </div>
+                    <div class="public-review-info">
+                      <h3 class="public-review-movie-title">${review.movieTitle}</h3>
+                      <div class="public-review-rating-row">
+                        <span class="public-review-stars">${stars}</span>
+                        <span class="public-review-rating-val">${review.rating.toFixed(1)}</span>
+                        <span class="public-review-date">• Resenhado em ${dateStr}</span>
+                      </div>
+                      <h4 class="public-review-title">"${review.reviewTitle}"</h4>
+                      <p class="public-review-body" style="font-size: 0.92rem; color: #bbb; line-height: 1.6; white-space: pre-wrap;">${bodyHtml}</p>
+                      <a href="detalhes.html?id=${review.movieId}&type=${review.movieType || 'movie'}" class="btn btn-primary" style="display:inline-flex; align-items:center; gap:6px; text-decoration:none; padding: 6px 14px; font-size: 0.8rem; height: auto; font-weight: bold; width: fit-content; margin-top: 15px; background: #e50914; border: 1px solid #e50914; border-radius: 4px; color: #fff;">
+                          <i class="fas fa-play"></i> Assistir Agora
+                      </a>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `;
+        }
+
+              const isLogged = auth.currentUser;
+              const ctaHtml = isLogged ? `
+                <h4>Você já faz parte! 🎉</h4>
+                <p>Que tal escrever novas resenhas e atualizar seu diário cinéfilo no WinBry?</p>
+                <a href="minha-conta.html" class="btn btn-primary" style="display:block; padding:12px; font-size:0.9rem;">Ir para Minha Conta</a>
+              ` : `
+                <h4>Escreva você também!</h4>
+                <p>Crie sua estante de cinema, avalie suas produções favoritas e use a nossa inteligência artificial integrada!</p>
+                <a href="cadastro.html" class="btn btn-primary" style="display:block; padding:12px; font-size:0.9rem;">Criar Minha Conta</a>
+              `;
+
+              container.innerHTML = `
+                <div class="profile-public-wrapper">
+                  <aside class="profile-public-sidebar">
+                    <div class="public-avatar-wrapper">
+                      <img src="${profileImage}" alt="${username}">
+                    </div>
+                    <h2>${username}</h2>
+                    <span class="cinephile-tag"><i class="fas fa-film"></i> Cinéfilo WinBry</span>
+                    
+                    <div class="public-stats-grid">
+                      <div class="public-stat-item">
+                        <i class="fas fa-pen-fancy"></i>
+                        <span class="public-stat-val">${reviewsCount}</span>
+                        <span class="public-stat-lbl">Resenhas</span>
+                      </div>
+                      <div class="public-stat-item">
+                        <i class="fas fa-star"></i>
+                        <span class="public-stat-val">${averageRating}</span>
+                        <span class="public-stat-lbl">Média</span>
+                      </div>
+                    </div>
+      
+                    <div class="public-cta-card">
+                      ${ctaHtml}
+                    </div>
+                  </aside>
+
+            <main class="profile-public-feed">
+              <h1>Diário Cinéfilo</h1>
+              <p class="feed-subtitle">Confira todas as opiniões, notas e críticas de filmes e séries escritas por ${username}.</p>
+              ${reviewsHtml}
+            </main>
+          </div>
+        `;
+
+      } catch (err) {
+        console.error("Erro ao carregar perfil:", err);
+        container.innerHTML = `
+          <div class="profile-error-state">
+            <i class="fas fa-wifi"></i>
+            <h3>Erro de Conexão</h3>
+            <p>Houve uma falha na comunicação com o banco de dados do Firestore. Por favor, verifique sua conexão.</p>
+            <button onclick="window.location.reload()" class="btn btn-primary">Tentar Novamente</button>
+          </div>
+        `;
+      }
+    }
+  </script>
+</body>
+
+</html>

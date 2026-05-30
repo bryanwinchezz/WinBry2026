@@ -1108,6 +1108,12 @@ async function loadDetails(type, id) {
     const nota = item.vote_average.toFixed(1);
     const duracaoTxt = formatDuration(item.runtime, item.number_of_seasons);
 
+    // Lógica da tag de qualidade dinâmica (HD vs CINEMA)
+    const qualidadeVal = getQualityBadge(item, type);
+    const qualidadeHtml = qualidadeVal === 'CINEMA'
+        ? `<span class="qualidade cinema" title="Filme lançado recentemente nos cinemas. Imagem gravada de tela."><i class="fas fa-video"></i> CINEMA</span>`
+        : `<span class="qualidade hd" title="Imagem digital em alta definição."><i class="fas fa-compact-disc"></i> HD</span>`;
+
     // --- LÓGICA DO LER MAIS (Threshold aumentado para 350 caracteres) ---
     const sinopseTexto = item.overview || "Sinopse não disponível.";
     const isLongText = sinopseTexto.length > 350;
@@ -1137,7 +1143,7 @@ async function loadDetails(type, id) {
                         <span class="separator">•</span>
                         <span>${duracaoTxt}</span>
                         <span class="separator">•</span>
-                        <span class="qualidade">HD</span>
+                        ${qualidadeHtml}
                     </div>
                     
                     ${sinopseHtml} 
@@ -1248,6 +1254,88 @@ async function loadDetails(type, id) {
             }
         });
     }
+
+    // --- CONTEÚDO RELACIONADO E SEÇÕES DE STREAMINGS ORDENADOS EM DETALHES ---
+    try {
+        const phrases = [
+            "Assista também", "Títulos semelhantes", "Porque você assistiu...",
+            "Clientes também assistiram", "Filmes relacionados",
+            "Sugestões para você", "Conteúdo relacionado",
+            "Você também pode gostar", "Mais como este",
+            "Mais para explorar", "Se você gostou disso...",
+            "Programas relacionados",
+            "Você pode gostar", "Veja também",
+            "Recomendado para você"
+        ];
+        const randomPhrase = phrases[Math.floor(Math.random() * phrases.length)];
+
+        // Busca conteúdo recomendado
+        const recData = await fetchTMDB(`/${type}/${id}/recommendations`);
+        let similarItems = (recData && recData.results) ? recData.results : [];
+
+        // Fallback para similares se não houver recomendações
+        if (similarItems.length === 0) {
+            const simData = await fetchTMDB(`/${type}/${id}/similar`);
+            similarItems = (simData && simData.results) ? simData.results : [];
+        }
+
+        // Filtro anti-hentai/adulto para animes
+        if (type === 'tv' && item.genres && item.genres.some(g => g.id === 16)) {
+            similarItems = filterAdultAnimes(similarItems);
+        }
+
+        if (similarItems && similarItems.length > 0) {
+            const container = document.getElementById('details-container');
+            if (container) {
+                // Remove qualquer carrossel de recomendados já existente para evitar duplicatas
+                const existingSimilar = container.querySelector('.similar-section-wrapper');
+                if (existingSimilar) {
+                    existingSimilar.remove();
+                }
+                const carouselInner = similarItems.slice(0, 15).map(sim => {
+                    const simType = sim.media_type || type;
+                    const simPoster = sim.poster_path ? `${IMG_BASE}${sim.poster_path}` : 'images/favicon.png';
+                    const simTitle = sim.title || sim.name;
+                    const simAno = (sim.release_date || sim.first_air_date || '????').substring(0, 4);
+                    return `
+                    <a href="detalhes.html?id=${sim.id}&type=${simType}" class="content-card" style="flex-shrink:0; width: 170px;">
+                        <img src="${simPoster}" alt="${simTitle}" loading="lazy">
+                        <div class="card-info">
+                            <h3>${simTitle}</h3>
+                            <p>${simAno}</p>
+                        </div>
+                    </a>`;
+                }).join('');
+
+                const similarHtml = `
+                <div class="similar-section-wrapper container" style="margin-top: 50px; margin-bottom: 70px; padding: 0 20px;">
+                    <h2 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 20px; color: #fff;">${randomPhrase}</h2>
+                    <div class="carousel-wrapper" style="position:relative;">
+                        <button class="carousel-btn prev" style="left: -15px;"><i class="fas fa-chevron-left"></i></button>
+                        <div class="carousel similar-carousel" style="display:flex; gap:15px; overflow-x:auto; scrollbar-width:none; padding:10px 0;">
+                            ${carouselInner}
+                        </div>
+                        <button class="carousel-btn next" style="right: -15px;"><i class="fas fa-chevron-right"></i></button>
+                    </div>
+                </div>
+                `;
+
+                const wrapperDiv = document.createElement('div');
+                wrapperDiv.innerHTML = similarHtml;
+                container.appendChild(wrapperDiv.firstElementChild);
+
+                const carouselEl = container.querySelector('.similar-carousel');
+                const prevBtn = container.querySelector('.similar-section-wrapper .prev');
+                const nextBtn = container.querySelector('.similar-section-wrapper .next');
+                if (carouselEl && prevBtn && nextBtn) {
+                    prevBtn.onclick = () => carouselEl.scrollBy({ left: -340, behavior: 'smooth' });
+                    nextBtn.onclick = () => carouselEl.scrollBy({ left: 340, behavior: 'smooth' });
+                }
+            }
+        }
+    } catch (simError) {
+        console.error("Erro ao carregar conteúdo recomendado:", simError);
+    }
 }
 
 function setupHeroBanner(item) {
@@ -1323,6 +1411,26 @@ function renderCarousel(sectionId, title, items, type) {
 }
 
 // --- HELPER FUNCTIONS ---
+
+function getQualityBadge(item, type) {
+    if (type !== 'movie') return 'HD';
+    
+    const releaseDateStr = item.release_date;
+    if (!releaseDateStr) return 'HD';
+    
+    const releaseDate = new Date(releaseDateStr);
+    const today = new Date();
+    
+    // Diferença em milissegundos convertida para dias
+    const diffTime = today - releaseDate;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    // Se lançado há menos de 90 dias (ou lançamento futuro), é considerado qualidade de CINEMA
+    if (diffDays <= 90) {
+        return 'CINEMA';
+    }
+    return 'HD';
+}
 
 function formatDuration(minutes, seasons) {
     if (seasons) return seasons + (seasons === 1 ? " Temporada" : " Temporadas");
@@ -1478,6 +1586,42 @@ function initMinhaConta() {
         };
     }
 
+    // Botão de Compartilhar Resenhas do Perfil
+    const btnShareProfileReviews = document.getElementById('btn-share-profile-reviews');
+    if (btnShareProfileReviews) {
+        btnShareProfileReviews.onclick = () => {
+            if (!currentUser) {
+                showToast("Faça login para compartilhar suas resenhas!", "warning");
+                return;
+            }
+            const basePath = window.location.href.split('minha-conta.html')[0];
+            const shareUrl = `${basePath}perfil.html?uid=${currentUser.uid}`;
+            const shareText = `Confira meu perfil de resenhas no WinBry! 🎬🍿`;
+
+            if (navigator.share) {
+                navigator.share({
+                    title: `Perfil Cinéfilo - WinBry`,
+                    text: shareText,
+                    url: shareUrl
+                }).then(() => {
+                    showToast("Perfil compartilhado com sucesso!", "success");
+                }).catch((err) => {
+                    if (err.name !== 'AbortError') {
+                        showToast("Erro ao compartilhar.", "error");
+                    }
+                });
+            } else {
+                navigator.clipboard.writeText(`${shareText}\nLink: ${shareUrl}`)
+                    .then(() => {
+                        showToast("Link do seu perfil copiado com sucesso! Compartilhe com seus amigos. 🍿", "success");
+                    })
+                    .catch(() => {
+                        showToast("Erro ao copiar o link do perfil.", "error");
+                    });
+            }
+        };
+    }
+
     // Logout do usuário
     const logoutBtnMinhaConta = document.querySelector('.btn-logout-danger') || document.querySelector('.btn-logout-dashboard');
     if (logoutBtnMinhaConta) {
@@ -1569,19 +1713,35 @@ function initMinhaConta() {
 
     // 4. LÓGICA DE GERENCIAMENTO DE RESENHAS (CRUD LETTERBOXD)
     
-    // Auxiliar: Gera o HTML estático das estrelas para a listagem
+    // Auxiliar: Gera o HTML estático das estrelas para a listagem (10 estrelas inteiras)
     const generateStaticStarsHTML = (nota) => {
         let html = '';
-        for (let index = 1; index <= 5; index++) {
+        for (let index = 1; index <= 10; index++) {
             if (index <= Math.floor(nota)) {
-                html += '<i class="fas fa-star"></i>';
-            } else if (index === Math.ceil(nota) && nota % 1 !== 0) {
-                html += '<i class="fas fa-star-half-alt"></i>';
+                html += '<i class="fas fa-star" style="font-size: 0.72rem; margin-right: 1px; color: #ffd700;"></i>';
             } else {
-                html += '<i class="far fa-star"></i>';
+                html += '<i class="far fa-star" style="font-size: 0.72rem; margin-right: 1px; color: rgba(255,255,255,0.15);"></i>';
             }
         }
         return html;
+    };
+
+    // Alterna o texto de "Ver mais" / "Ver menos" de resenhas longas globalmente
+    window.toggleReadMore = function(btn) {
+        const container = btn.parentNode;
+        const shortText = container.querySelector('.review-short-text');
+        const fullText = container.querySelector('.review-full-text');
+        if (shortText && fullText) {
+            if (shortText.style.display === 'none') {
+                shortText.style.display = 'inline';
+                fullText.style.display = 'none';
+                btn.innerText = 'Ver mais';
+            } else {
+                shortText.style.display = 'none';
+                fullText.style.display = 'inline';
+                btn.innerText = 'Ver menos';
+            }
+        }
     };
 
     // Renderiza a lista de resenhas na aba
@@ -1608,6 +1768,9 @@ function initMinhaConta() {
             const dateStr = date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
             const starsHtml = generateStaticStarsHTML(review.rating);
             
+            const isLong = review.reviewBody && review.reviewBody.length > 280;
+            const bodyHtml = isLong ? `<span class="review-short-text">${review.reviewBody.substring(0, 260)}...</span><span class="review-full-text" style="display:none;">${review.reviewBody}</span> <button type="button" class="btn-read-more" onclick="toggleReadMore(this)" style="background:none; border:none; color:#e50914; font-weight:bold; cursor:pointer; padding:0; font-size:0.82rem; display:inline; outline:none; text-transform:uppercase; letter-spacing:0.5px; margin-left:5px;">Ver mais</button>` : `<span>${review.reviewBody || ''}</span>`;
+
             return `
                 <div class="review-card" data-id="${review.id}">
                     <div class="review-card-movie-poster">
@@ -1623,12 +1786,15 @@ function initMinhaConta() {
                             <span class="review-card-date">• ${dateStr}</span>
                         </div>
                         <h4 class="review-card-title">"${review.reviewTitle}"</h4>
-                        <p class="review-card-body">${review.reviewBody}</p>
-                        <div class="review-card-actions">
-                            <button class="btn-review-action btn-edit-review" onclick="editReview('${review.id}')">
+                        <p class="review-card-body" style="font-size: 0.92rem; color: #bbb; line-height: 1.6; white-space: pre-wrap;">${bodyHtml}</p>
+                        <div class="review-card-actions" style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px;">
+                            <a href="detalhes.html?id=${review.movieId}&type=${review.movieType || 'movie'}" class="btn btn-primary btn-review-action" style="display:inline-flex; align-items:center; gap:6px; text-decoration:none; padding: 6px 14px; font-size: 0.8rem; height: auto; font-weight: bold; background: #e50914; border: 1px solid #e50914; border-radius: 4px; color: #fff;">
+                                <i class="fas fa-play"></i> Assistir Agora
+                            </a>
+                            <button class="btn-review-action btn-edit-review" onclick="editReview('${review.id}')" style="height: auto; padding: 6px 14px;">
                                 <i class="fas fa-edit"></i> Editar
                             </button>
-                            <button class="btn-review-action btn-delete-review" onclick="deleteReview('${review.id}')">
+                            <button class="btn-review-action btn-delete-review" onclick="deleteReview('${review.id}')" style="height: auto; padding: 6px 14px;">
                                 <i class="fas fa-trash-alt"></i> Excluir
                             </button>
                         </div>
@@ -1776,7 +1942,7 @@ function initMinhaConta() {
         btnRemoveSelected.onclick = deselectMovie;
     }
 
-    // --- ESTRELAS INTERATIVAS (0.5 a 5.0) ---
+    // --- ESTRELAS INTERATIVAS (0 a 10) ---
     const starsContainer = document.getElementById('star-rating-interactive');
     const ratingInput = document.getElementById('review-rating-val');
     const ratingText = document.getElementById('rating-display-value');
@@ -1786,10 +1952,8 @@ function initMinhaConta() {
         const stars = starsContainer.querySelectorAll('i');
         stars.forEach(star => {
             const index = parseInt(star.getAttribute('data-index'));
-            if (index <= Math.floor(nota)) {
+            if (index <= nota) {
                 star.className = 'fas fa-star';
-            } else if (index === Math.ceil(nota) && nota % 1 !== 0) {
-                star.className = 'fas fa-star-half-alt';
             } else {
                 star.className = 'far fa-star';
             }
@@ -1800,27 +1964,19 @@ function initMinhaConta() {
         const stars = starsContainer.querySelectorAll('i');
         
         stars.forEach(star => {
-            // Hover: calcula meia estrela com base na posição X do mouse dentro do elemento
-            star.addEventListener('mousemove', (e) => {
+            // Hover: preenche as estrelas inteiras com base no index
+            star.addEventListener('mousemove', () => {
                 const index = parseInt(star.getAttribute('data-index'));
-                const rect = star.getBoundingClientRect();
-                const isHalf = (e.clientX - rect.left) < (rect.width / 2);
-                const hoverVal = isHalf ? (index - 0.5) : index;
-                
-                drawInteractiveStars(hoverVal);
-                if (ratingText) ratingText.innerText = `${hoverVal.toFixed(1)} Estrelas`;
+                drawInteractiveStars(index);
+                if (ratingText) ratingText.innerText = `${index}.0 Estrelas`;
             });
 
-            // Clique: fixa o valor calculado da nota no input e atualiza textos
-            star.addEventListener('click', (e) => {
+            // Clique: fixa o valor da nota inteira (1 a 10) no input e atualiza
+            star.addEventListener('click', () => {
                 const index = parseInt(star.getAttribute('data-index'));
-                const rect = star.getBoundingClientRect();
-                const isHalf = (e.clientX - rect.left) < (rect.width / 2);
-                const finalVal = isHalf ? (index - 0.5) : index;
-                
-                if (ratingInput) ratingInput.value = finalVal;
-                if (ratingText) ratingText.innerText = `${finalVal.toFixed(1)} Estrelas`;
-                drawInteractiveStars(finalVal);
+                if (ratingInput) ratingInput.value = index;
+                if (ratingText) ratingText.innerText = `${index}.0 Estrelas`;
+                drawInteractiveStars(index);
             });
         });
 
@@ -1829,9 +1985,19 @@ function initMinhaConta() {
             const currentVal = parseFloat(ratingInput ? ratingInput.value : 0);
             drawInteractiveStars(currentVal);
             if (ratingText) {
-                ratingText.innerText = currentVal > 0 ? `${currentVal.toFixed(1)} Estrelas` : 'Sem Nota';
+                ratingText.innerText = `${currentVal.toFixed(1)} Estrelas`;
             }
         });
+
+        // Botão para Zerar a Nota (0 Estrelas)
+        const btnZeroRating = document.getElementById('btn-zero-rating');
+        if (btnZeroRating) {
+            btnZeroRating.onclick = () => {
+                if (ratingInput) ratingInput.value = "0";
+                if (ratingText) ratingText.innerText = "0.0 Estrelas";
+                drawInteractiveStars(0);
+            };
+        }
     }
 
     // --- FUNÇÕES GLOBAIS DO CRUD (WINDOW) ---
@@ -1892,7 +2058,7 @@ function initMinhaConta() {
 
             // Reseta nota e estrelas
             if (ratingInput) ratingInput.value = "0";
-            if (ratingText) ratingText.innerText = "Sem Nota";
+            if (ratingText) ratingText.innerText = "0.0 Estrelas";
             drawInteractiveStars(0);
 
             // Reseta formulário de textos
@@ -1925,8 +2091,8 @@ function initMinhaConta() {
             if (!movieId) {
                 return showToast("Por favor, pesquise e selecione um filme/série!", "error");
             }
-            if (ratingVal <= 0) {
-                return showToast("Por favor, atribua uma nota clicando nas estrelas!", "error");
+            if (ratingVal < 0) {
+                return showToast("Por favor, atribua uma nota válida!", "error");
             }
 
             const editId = document.getElementById('review-edit-id').value;
@@ -2114,7 +2280,7 @@ function initMinhaConta() {
 
             // Reseta nota e estrelas
             if (ratingInput) ratingInput.value = "0";
-            if (ratingText) ratingText.innerText = "Sem Nota";
+            if (ratingText) ratingText.innerText = "0.0 Estrelas";
             drawInteractiveStars(0);
 
             // Reseta formulário de textos
@@ -2205,13 +2371,139 @@ function initSearch() {
 function openVideoModal(url) {
     const modal = document.getElementById('video-modal');
     const iframe = document.getElementById('video-iframe');
-    if (modal && iframe) { iframe.src = url; modal.classList.add('show'); }
+    if (modal && iframe) { 
+        iframe.src = url; 
+        modal.classList.add('show'); 
+        
+        // Oculta os botões flutuantes para não cobrir a tela do player
+        const bryiaBtn = document.getElementById('bryia-fab');
+        const surpriseBtn = document.querySelector('.surpreenda-fab');
+        if (bryiaBtn) bryiaBtn.style.display = 'none';
+        if (surpriseBtn) surpriseBtn.style.display = 'none';
+
+        // Injeta dinamicamente o botão de Picture-in-Picture premium
+        injectPipButton();
+    }
+}
+function togglePictureInPicture() {
+    const modal = document.getElementById('video-modal');
+    const iframe = document.getElementById('video-iframe');
+    if (!modal || !iframe) return;
+
+    // 1. SUPORTE A REAL PICTURE-IN-PICTURE (OS-LEVEL - DRAGGABLE & RESIZABLE)
+    // Funciona perfeitamente em Chrome, Edge, Opera e Opera GX
+    if ('documentPictureInPicture' in window) {
+        try {
+            // Se já tiver uma janela PiP aberta, fecha ela
+            if (window.pipWindowInstance) {
+                window.pipWindowInstance.close();
+                return;
+            }
+
+            // O video-wrapper é o container do iframe
+            const videoWrapper = iframe.parentNode || iframe;
+            const parent = videoWrapper.parentNode;
+            
+            // Cria um placeholder na DOM original para guardar o lugar do player
+            const placeholder = document.createElement('div');
+            placeholder.id = 'video-placeholder';
+            parent.insertBefore(placeholder, videoWrapper);
+
+            // Abre a janela PiP flutuante nativa do sistema operacional (Draggable & Resizable)
+            documentPictureInPicture.requestWindow({
+                width: 720,
+                height: 405,
+            }).then(pipWindow => {
+                window.pipWindowInstance = pipWindow;
+
+                // Move o container do iframe para a janela PiP
+                pipWindow.document.body.appendChild(videoWrapper);
+                
+                // Estiliza a janela PiP para ficar preenchida e perfeita
+                const style = pipWindow.document.createElement('style');
+                style.textContent = `
+                    body { margin: 0; padding: 0; background: #000; overflow: hidden; height: 100vh; display: flex; align-items: center; justify-content: center; }
+                    .video-wrapper { width: 100vw !important; height: 100vh !important; padding-bottom: 0 !important; }
+                    iframe { width: 100% !important; height: 100% !important; border: none; }
+                `;
+                pipWindow.document.head.appendChild(style);
+
+                // Fecha o modal original temporariamente para ficar limpo
+                modal.classList.remove('show');
+
+                // Quando a janela PiP for fechada pelo usuário, restaura o player no modal original
+                pipWindow.addEventListener('pagehide', () => {
+                    const backPlaceholder = document.getElementById('video-placeholder');
+                    if (backPlaceholder) {
+                        backPlaceholder.parentNode.insertBefore(videoWrapper, backPlaceholder);
+                        backPlaceholder.remove();
+                    }
+                    window.pipWindowInstance = null;
+                    
+                    // Reabre o modal de volta
+                    modal.classList.add('show');
+                });
+                
+                showToast("Picture-in-Picture ativado! Arraste e redimensione como desejar na sua tela.", "success");
+            }).catch(err => {
+                console.error(err);
+                fallbackInAppPiP(modal);
+            });
+        } catch (err) {
+            console.error(err);
+            fallbackInAppPiP(modal);
+        }
+    } else {
+        // 2. FALLBACK PARA NAVEGADORES SEM DPip (Firefox / Safari)
+        fallbackInAppPiP(modal);
+    }
+}
+function fallbackInAppPiP(modal) {
+    modal.classList.toggle('pip-active');
+    if (modal.classList.contains('pip-active')) {
+        showToast("Picture-in-Picture embutido ativado! Para flutuar fora do navegador, use a função nativa do Firefox.", "success");
+    } else {
+        showToast("Picture-in-Picture desativado.", "info");
+    }
+}
+function injectPipButton() {
+    const modalContent = document.querySelector('.video-modal-content');
+    if (!modalContent || document.getElementById('btn-pip-global')) return;
+
+    const pipBtn = document.createElement('button');
+    pipBtn.id = 'btn-pip-global';
+    pipBtn.className = 'btn-pip-custom';
+    pipBtn.title = "Picture in Picture (Minimizar Tela)";
+    pipBtn.innerHTML = '<i class="fas fa-window-restore"></i>';
+    
+    modalContent.appendChild(pipBtn);
+    pipBtn.onclick = togglePictureInPicture;
+}
+function closeVideoModal() {
+    const modal = document.getElementById('video-modal');
+    const iframe = document.getElementById('video-iframe');
+    if (modal && iframe) { 
+        // Fecha janela PiP nativa do OS se estiver aberta
+        if (window.pipWindowInstance) {
+            window.pipWindowInstance.close();
+        }
+
+        modal.classList.remove('show'); 
+        modal.classList.remove('pip-active'); // Desativa o PiP in-app ao fechar
+        iframe.src = ''; 
+        
+        // Reexibe os botões flutuantes se o usuário estiver logado
+        const bryiaBtn = document.getElementById('bryia-fab');
+        const surpriseBtn = document.querySelector('.surpreenda-fab');
+        if (currentUser) {
+            if (bryiaBtn) bryiaBtn.style.display = 'flex';
+            if (surpriseBtn) surpriseBtn.style.display = 'flex';
+        }
+    }
 }
 function initVideoModal() {
-    const modal = document.getElementById('video-modal');
     const close = document.getElementById('close-player');
-    const iframe = document.getElementById('video-iframe');
-    if (close) close.onclick = () => { modal.classList.remove('show'); iframe.src = ''; };
+    if (close) close.onclick = () => { closeVideoModal(); };
 }
 function initTheme() {
     const toggle = document.getElementById('theme-toggle');
@@ -2460,13 +2752,8 @@ function initSaveButton() {
         saveUserDataToCloud();
         showToast("Progresso salvo na nuvem!", "success");
 
-        // Fecha o modal do player de vídeo automaticamente
-        const modal = document.getElementById('video-modal');
-        const iframe = document.getElementById('video-iframe');
-        if (modal && iframe) {
-            modal.classList.remove('show');
-            iframe.src = '';
-        }
+        // Fecha o modal do player de vídeo automaticamente com suporte a reexibição dos FABs
+        closeVideoModal();
 
         loadContinueWatching();
     };
@@ -2674,13 +2961,32 @@ function initHeroCarousel(items) {
     startTimer();
 }
 
-// Função auxiliar para o botão assistir dentro do HTML gerado
-window.playHeroMovie = function (id, type) {
-    // Busca IDs externos (IMDB) se necessário
-    fetchTMDB(`/${type}/${id}/external_ids`).then(ids => {
-        const playId = ids.imdb_id || id;
-        const playerBase = (type === 'tv') ? TV_PLAYER_BASE : MOVIE_PLAYER_BASE;
-        openVideoModal(`${playerBase}/${playId}`);
+// Função auxiliar para o botão assistir dentro do HTML gerado da Home
+window.playHeroMovie = async function (id, type) {
+    // 1. Busca os dados completos da obra no TMDB para salvar o progresso
+    const item = await fetchTMDB(`/${type}/${id}`);
+    if (!item) return;
+
+    const poster = item.poster_path ? `${IMG_BASE}${item.poster_path}` : 'images/favicon.png';
+    const titulo = item.title || item.name;
+
+    // 2. Prepara a URL correta (TMDB ID para TV/Anime, IMDB ID para Filmes)
+    let playId = id;
+    if (type === 'movie') {
+        const ids = await fetchTMDB(`/movie/${id}/external_ids`);
+        playId = (ids && ids.imdb_id) ? ids.imdb_id : id;
+    }
+
+    const playerBase = (type === 'tv' || type === 'anime') ? TV_PLAYER_BASE : MOVIE_PLAYER_BASE;
+    const videoUrl = `${playerBase}/${playId}`;
+
+    // 3. Abre o player e configura o progresso para o Continuar Assistindo
+    openVideoModal(videoUrl);
+    setupSaveProgress({
+        id: item.id,
+        type: type,
+        titulo: titulo,
+        poster: poster
     });
 };
 

@@ -25,7 +25,7 @@
     "productName": "WinBry",
     "artifactName": "WinBry-Setup.${ext}",
     "directories": {
-      "output": "dist-installer"
+      "output": "dist-final"
     },
     "win": {
       "target": "nsis",

@@ -658,12 +658,31 @@ header .container {
 }
 
 .qualidade {
-    border: 2px solid #ffffff !important; /* Borda branca grossa e visível */
-    padding: 2px 8px !important;
-    border-radius: 4px;
-    font-size: 0.9rem !important; /* Maior */
+    border-radius: 6px !important;
+    padding: 3px 10px !important;
+    font-size: 0.85rem !important;
     font-weight: 800 !important;
-    color: #ffffff !important;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 2px solid transparent !important;
+    transition: all 0.3s ease;
+}
+
+.qualidade.cinema {
+    border-color: #ff9f0a !important;
+    color: #ff9f0a !important;
+    background-color: rgba(255, 159, 10, 0.12) !important;
+    box-shadow: 0 0 10px rgba(255, 159, 10, 0.2);
+}
+
+.qualidade.hd {
+    border-color: #30d158 !important;
+    color: #30d158 !important;
+    background-color: rgba(48, 209, 88, 0.12) !important;
+    box-shadow: 0 0 10px rgba(48, 209, 88, 0.2);
 }
 
 .actions {
@@ -1117,9 +1136,9 @@ input[type="file"] {
 
 .video-modal-content {
     position: relative;
-    width: 90%;
-    max-width: 1100px;
-    max-height: 90vh;
+    width: 95%;
+    max-width: 1350px;
+    max-height: 92vh;
     background: #000;
     border-radius: 8px;
     box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
@@ -5491,8 +5510,16 @@ body.light-mode .bryia-card .btn-play-mini:hover {
     }
 }
 
-/* Modal do Player de Vídeo em Tela Cheia no Celular (Maior para cima) */
+/* =================================================================
+   MODAL DE ASSISTIR - RESPONSIVIDADE ULTRA-PREMIUM (RETRATO & PAISAGEM)
+   ================================================================= */
 @media (max-width: 768px) {
+    .video-modal {
+        background-color: rgba(0, 0, 0, 0.98) !important;
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+    }
+    
     .video-modal-content {
         width: 100% !important;
         height: 100vh !important;
@@ -5500,51 +5527,330 @@ body.light-mode .bryia-card .btn-play-mini:hover {
         border-radius: 0 !important;
         display: flex !important;
         flex-direction: column !important;
+        justify-content: center !important; /* Centraliza verticalmente a tela do filme e os controles */
+        background: #050505 !important;
+        border: none !important;
+        position: relative !important;
     }
+    
     .video-wrapper {
-        padding-bottom: 56.25% !important; /* Mantém proporção perfeita widescreen */
+        padding-bottom: 56.25% !important; /* Mantém proporção perfeita widescreen 16:9 */
         width: 100% !important;
+        background: #000 !important;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.9);
     }
-    .player-controls {
-        padding: 20px 15px !important;
-        gap: 15px !important;
+    
+    /* Botão de fechar flutuando de forma super premium no topo direito */
+    .close-btn-custom {
+        position: absolute !important;
+        top: 25px !important; /* Fica no espaço preto acima do player centralizado */
+        right: 20px !important;
+        width: 42px !important;
+        height: 42px !important;
+        background-color: rgba(255, 255, 255, 0.08) !important;
+        backdrop-filter: blur(8px) !important;
+        -webkit-backdrop-filter: blur(8px) !important;
+        border: 2px solid rgba(255, 255, 255, 0.2) !important;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5) !important;
+        font-size: 1.1rem !important;
+        border-radius: 50% !important;
+        display: flex !important;
+        align-items: center !important;
         justify-content: center !important;
-        flex-direction: row !important;
-        flex-wrap: wrap !important;
-        background: #141414 !important;
-        flex-grow: 1 !important; /* Expande para preencher o resto da tela vertical sem esmagar */
+        z-index: 3000 !important;
+        transition: all 0.2s ease-in-out !important;
+    }
+    
+    .close-btn-custom:hover {
+        background-color: var(--color-primary) !important;
+        border-color: var(--color-primary) !important;
+        box-shadow: 0 0 15px var(--color-primary) !important;
+        transform: scale(1.08) !important;
+    }
+
+    /* Controles do player compactos e elegantes, sem esticar */
+    .player-controls {
+        padding: 12px 16px !important;
+        gap: 10px !important;
+        justify-content: center !important;
+        flex-direction: column !important; /* Elementos organizados verticalmente */
+        align-items: center !important;
+        background: rgba(15, 15, 15, 0.85) !important;
+        backdrop-filter: blur(10px) !important;
+        -webkit-backdrop-filter: blur(10px) !important;
+        box-sizing: border-box !important;
+        border: 1px solid rgba(255, 255, 255, 0.06) !important;
+        border-radius: 12px !important;
+        margin: 20px 15px 0 15px !important; /* Flutua sutilmente abaixo do filme */
+        flex-grow: 0 !important; /* NÃO ESTICA */
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6) !important;
+    }
+    
+    .control-section {
+        gap: 6px !important;
+        justify-content: center !important;
+        width: auto !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        background: rgba(255, 255, 255, 0.02) !important;
+        padding: 6px 12px !important;
+        border-radius: 6px !important;
+        border: 1px solid rgba(255, 255, 255, 0.03) !important;
         box-sizing: border-box !important;
     }
-    .control-section {
-        gap: 8px !important;
-        justify-content: center !important;
-        width: 100% !important; /* Deixa as seções bem espaçadas */
-    }
+    
     .border-left {
         border-left: none !important;
         padding-left: 0 !important;
     }
+    
     .label-title {
-        font-size: 0.85rem !important;
-        margin-right: 5px !important;
-        color: #fff !important;
+        font-size: 0.72rem !important; /* Texto menor e elegante */
+        color: #888888 !important;
+        letter-spacing: 0.5px !important;
+        text-transform: uppercase !important;
     }
+    
     .player-controls input {
-        width: 65px !important;
-        padding: 8px !important;
-        font-size: 0.95rem !important;
+        width: 48px !important; /* Inputs menores para marcar o tempo de forma discreta */
+        padding: 5px 6px !important;
+        font-size: 0.85rem !important;
+        background: rgba(255, 255, 255, 0.04) !important;
+        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        border-radius: 5px !important;
+        color: #fff !important;
         height: auto !important;
     }
+    
+    .player-controls input:focus {
+        border-color: var(--color-primary) !important;
+        background: rgba(255, 255, 255, 0.08) !important;
+        box-shadow: 0 0 8px rgba(229, 9, 20, 0.3) !important;
+    }
+    
     .btn-save {
         padding: 10px 20px !important;
         font-size: 0.95rem !important;
-        margin-left: 0 !important;
         width: 100% !important;
+        max-width: 200px !important; /* Evita que o botão fique esticado horizontalmente */
         text-align: center !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        gap: 5px !important;
+        gap: 6px !important;
+        margin-top: 5px !important;
+        border-radius: 8px !important;
+        background-color: var(--color-primary) !important;
+        box-shadow: 0 4px 12px rgba(229, 9, 20, 0.3) !important;
+        font-weight: 700 !important;
+    }
+    
+    .btn-save:hover {
+        background-color: #b0060f !important;
+        box-shadow: 0 6px 16px rgba(229, 9, 20, 0.5) !important;
+    }
+}
+
+/* PAISAGEM MOBILE (LANDSCAPE): Layout Dividido Lado a Lado Premium */
+@media (max-height: 500px) and (orientation: landscape) and (max-width: 950px) {
+    .video-modal-content {
+        flex-direction: row !important;
+        height: 100vh !important;
+        max-height: 100vh !important;
+        border-radius: 0 !important;
+        width: 100% !important;
+        overflow: hidden !important;
+    }
+    
+    .video-wrapper {
+        flex: 1.6 !important;
+        height: 100vh !important;
+        padding-bottom: 0 !important; /* Desativa a proporção travada */
+        box-shadow: 10px 0 30px rgba(0, 0, 0, 0.5) !important;
+    }
+    
+    .video-wrapper iframe {
+        height: 100% !important;
+        width: 100% !important;
+    }
+    
+    .player-controls {
+        flex: 1 !important;
+        height: 100vh !important;
+        flex-direction: column !important;
+        justify-content: center !important;
+        align-items: stretch !important;
+        padding: 20px !important;
+        border-top: none !important;
+        border-left: 1px solid rgba(255, 255, 255, 0.05) !important;
+        overflow-y: auto !important;
+        background: #0f0f0f !important;
+    }
+    
+    .control-section {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        width: 100% !important;
+        padding: 10px 14px !important;
+        gap: 6px !important;
+    }
+    
+    .input-group {
+        justify-content: space-between !important;
+        width: 100% !important;
+    }
+    
+    .player-controls input {
+        width: 65px !important;
+        padding: 6px !important;
+        font-size: 0.9rem !important;
+    }
+    
+    .btn-save {
+        width: 100% !important;
         margin-top: 10px !important;
+        padding: 10px !important;
+        font-size: 0.95rem !important;
+    }
+    
+    .close-btn-custom {
+        top: 15px !important;
+        left: 15px !important; /* Move para a esquerda na paisagem para não sumir */
+        right: auto !important;
+    }
+}
+
+/* =================================================================
+   BOTÃO PICTURE IN PICTURE PREMIUM (GLOBAL)
+   ================================================================= */
+.btn-pip-custom {
+    position: absolute !important;
+    top: 10px !important;
+    right: 55px !important; /* Posicionado perfeitamente ao lado do fechar (X) */
+    width: 35px !important;
+    height: 35px !important;
+    background-color: rgba(255, 255, 255, 0.08) !important;
+    backdrop-filter: blur(4px) !important;
+    -webkit-backdrop-filter: blur(4px) !important;
+    color: white !important;
+    border-radius: 50% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 0.95rem !important;
+    cursor: pointer !important;
+    z-index: 3000 !important;
+    border: 2px solid rgba(255, 255, 255, 0.2) !important;
+    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.2s, box-shadow 0.2s !important;
+}
+
+.btn-pip-custom:hover {
+    transform: scale(1.1) !important;
+    background-color: var(--color-primary) !important;
+    border-color: var(--color-primary) !important;
+    box-shadow: 0 0 12px var(--color-primary) !important;
+}
+
+@media (max-width: 768px) {
+    .btn-pip-custom {
+        top: 25px !important;
+        right: 75px !important; /* Posicionado ao lado do fechar no retrato mobile */
+        width: 42px !important;
+        height: 42px !important;
+        background-color: rgba(10, 10, 10, 0.75) !important;
+        backdrop-filter: blur(8px) !important;
+        -webkit-backdrop-filter: blur(8px) !important;
+        border: 2px solid rgba(255, 255, 255, 0.25) !important;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5) !important;
+        font-size: 1.05rem !important;
+    }
+}
+
+/* Paisagem mobile: afasta o botão para não embolar com o fechar na esquerda */
+@media (max-height: 500px) and (orientation: landscape) and (max-width: 950px) {
+    .btn-pip-custom {
+        top: 15px !important;
+        left: 70px !important; /* Fica ao lado do X no canto esquerdo da tela */
+        right: auto !important;
+    }
+}
+
+/* =================================================================
+   MODO PICTURE-IN-PICTURE (DOCK FLUTUANTE UNIVERSAL) - SUPORTE A TODOS OS NAVEGADORES
+   ================================================================= */
+#video-modal.pip-active {
+    background-color: transparent !important;
+    pointer-events: none !important; /* Permite clicar no site atrás do player */
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+#video-modal.pip-active .video-modal-content {
+    position: fixed !important;
+    bottom: 85px !important;
+    right: 20px !important;
+    width: 380px !important;
+    height: auto !important;
+    max-height: none !important;
+    border-radius: 12px !important;
+    border: 2px solid rgba(255, 255, 255, 0.1) !important;
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.95) !important;
+    pointer-events: auto !important; /* Permite interagir com a janela do player */
+    z-index: 999999 !important;
+    overflow: hidden !important;
+    animation: popIn 0.3s ease !important;
+}
+
+/* Esconde os controles e campos de texto no modo PiP flutuante */
+#video-modal.pip-active .player-controls {
+    display: none !important;
+}
+
+/* Deixa o wrapper do player no modo widescreen perfeito */
+#video-modal.pip-active .video-wrapper {
+    padding-bottom: 56.25% !important;
+    width: 100% !important;
+    height: 0 !important;
+    border-radius: 10px !important;
+}
+
+#video-modal.pip-active .video-wrapper iframe {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+}
+
+/* Ajusta o botão de fechar e PiP no modo mini */
+#video-modal.pip-active .close-btn-custom {
+    top: 8px !important;
+    right: 8px !important;
+    width: 28px !important;
+    height: 28px !important;
+    font-size: 0.8rem !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+}
+
+#video-modal.pip-active .btn-pip-custom {
+    top: 8px !important;
+    right: 42px !important;
+    width: 28px !important;
+    height: 28px !important;
+    font-size: 0.8rem !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+}
+
+/* Responsividade Mobile no modo PiP */
+@media (max-width: 768px) {
+    #video-modal.pip-active .video-modal-content {
+        bottom: 80px !important; /* Acima do bottom nav */
+        right: 10px !important;
+        width: 240px !important; /* Perfeito e discreto para telas mobile */
+        margin: 0 !important;
+    }
+    
+    #video-modal.pip-active .btn-pip-custom {
+        right: 42px !important;
     }
 }
