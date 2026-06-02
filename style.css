@@ -258,6 +258,7 @@ header .container {
 .btn-trailer:hover,
 .btn-lista:hover {
     background-color: rgba(255, 255, 255, 0.3);
+    transform: scale(1.05);
 }
 
 .btn-lista.active {
@@ -506,6 +507,31 @@ header .container {
     font-size: 0.85rem;
     color: #ddd;
     margin: 0;
+}
+
+/* Ações no card (botão de trailer) */
+.card-actions {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 5;
+    display: flex;
+    gap: 8px;
+}
+.card-actions .btn-trailer {
+    background: rgba(0,0,0,0.6);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: #fff;
+    width: 40px;
+    height: 40px;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+.card-actions .btn-trailer:hover {
+    background: rgba(255,255,255,0.06);
 }
 
 .hubs-section {

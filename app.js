@@ -934,14 +934,61 @@ function createCardHTML(item, typeOverride) {
     const ano = (item.release_date || item.first_air_date || '????').substring(0, 4);
 
     return `
-    <a href="detalhes.html?id=${item.id}&type=${type}" class="content-card">
-        <img src="${poster}" alt="${titulo}" loading="lazy">
+    <div class="content-card">
+        <a href="detalhes.html?id=${item.id}&type=${type}" class="card-link">
+            <img src="${poster}" alt="${titulo}" loading="lazy">
+        </a>
         <div class="card-info">
             <h3>${titulo}</h3>
             <p>${ano}</p>
         </div>
-    </a>`;
+    </div>`;
 }
+
+// Busca trailer via TMDB Videos endpoint e retorna URL embeddable (YouTube embed ou arquivo direto)
+async function fetchTrailerUrl(type, id) {
+    try {
+        const data = await fetchTMDB(`/${type}/${id}/videos`);
+        if (!data || !data.results || data.results.length === 0) return null;
+
+        // Prioriza trailers oficiais do YouTube
+        const ytTrailer = data.results.find(v => /trailer/i.test(v.type) && /YouTube/i.test(v.site));
+        const anyTrailer = data.results.find(v => /trailer/i.test(v.type));
+
+        const pick = ytTrailer || anyTrailer || data.results[0];
+        if (!pick) return null;
+
+        if (/YouTube/i.test(pick.site) && pick.key) {
+            return `https://www.youtube.com/embed/${pick.key}?autoplay=1&rel=0`;
+        }
+
+        // Fallback: se vier com URL direta (pouco comum), retorna como está
+        if (pick.url) return pick.url;
+
+        return null;
+    } catch (err) {
+        console.error('Erro ao buscar trailer:', err);
+        return null;
+    }
+}
+
+// Delegação de clique para botões de trailer nos cards (apenas dentro de .card-actions)
+document.addEventListener('click', async (e) => {
+    const btn = e.target.closest && e.target.closest('.card-actions .btn-trailer');
+    if (!btn) return;
+    const id = btn.dataset.id;
+    const type = btn.dataset.type || 'movie';
+    if (!id) return; // segurança: requer data-id
+    btn.disabled = true;
+    const url = await fetchTrailerUrl(type, id);
+    if (url) {
+        openVideoModal(url);
+        setupSaveProgress({ id, type, titulo: '', poster: '' });
+    } else {
+        showToast('Trailer não encontrado.', 'info');
+    }
+    btn.disabled = false;
+});
 
 // --- PAGINAÇÃO CORRIGIDA (ESTÁTICA E LIMITADA A 500) ---
 function renderPagination(totalPages, currentPage, callback) {
@@ -1149,6 +1196,7 @@ async function loadDetails(type, id) {
                     ${sinopseHtml} 
                     <div class="actions">
                         <button class="btn btn-play" id="btn-assistir-detalhes"><i class="fas fa-play"></i> Assistir</button>
+                        <button class="btn btn-trailer" id="btn-trailer-detalhes"><i class="fas fa-film"></i> Trailer</button>
                         <button class="btn btn-lista" id="btn-add-lista"><i class="fas fa-bookmark"></i> Minha Lista</button>
                         <button class="btn btn-favorito" id="btn-add-favorito"><i class="far fa-heart"></i> Favoritar</button>
                         <button class="btn btn-resenha" id="btn-resenha-detalhes"><i class="fas fa-edit"></i> Resenha</button>
@@ -1199,6 +1247,24 @@ async function loadDetails(type, id) {
             });
 
         });
+    }
+
+    // Configura botão Trailer na página de detalhes
+    const btnTrailerDetalhes = document.getElementById('btn-trailer-detalhes');
+    if (btnTrailerDetalhes) {
+        // Busca trailer e habilita o botão se encontrado
+        (async () => {
+            const trailerUrl = await fetchTrailerUrl(type, id);
+            if (trailerUrl) {
+                btnTrailerDetalhes.onclick = () => {
+                    openVideoModal(trailerUrl);
+                    setupSaveProgress({ id: item.id, type: type, titulo: titulo, poster: poster });
+                };
+            } else {
+                // Se não há trailer, oculta botão
+                btnTrailerDetalhes.style.display = 'none';
+            }
+        })();
     }
 
     const btnLista = document.getElementById('btn-add-lista');
