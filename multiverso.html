@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="description"
+        content="Explore o Multiverso do Entretenimento no WinBry. Entre no universo de suas franquias favoritas como Marvel, DC, Star Wars, Harry Potter e muito mais.">
+    <meta name="keywords" content="multiverso, franquias, marvel, dc, star wars, harry potter, assistir online, WinBry">
+    <meta name="author" content="WinBry">
+    <meta name="theme-color" content="#e50914">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WinBry | Multiverso do Entretenimento</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/core-js/3.32.1/minified.js"></script>
+    <link rel="icon" href="images/favicon.png" />
+    <link rel="stylesheet" href="style.css?v=2026.06.29.2">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+</head>
+
+<body class="dark-mode page-multiverso">
+    <header class="multiverso-header">
+        <div class="container">
+            <div class="logo">
+                <a class="btn-log" href="index.html">WinBry</a>
+            </div>
+            <nav class="main-nav">
+                <ul>
+                    <li><a href="index.html">Início</a></li>
+                    <li><a href="filmes.html">Filmes</a></li>
+                    <li><a href="series.html">Séries</a></li>
+                    <li><a href="animes.html">Animes</a></li>
+                    <li><a href="canais.html">Canais</a></li>
+                </ul>
+            </nav>
+            <div class="user-actions">
+                <div class="search-box">
+                    <input type="text" id="search-input" placeholder="Buscar no Multiverso...">
+                    <a id="search-icon" class="icon-btn"><i class="fas fa-search"></i></a>
+                </div>
+                <a id="theme-toggle" class="icon-btn"><i class="fas fa-sun"></i></a>
+                <a href="formulario.html" class="icon-btn"><i class="fas fa-comments"></i></a>
+                <a href="minha-lista.html" class="icon-btn"><i class="fas fa-bookmark"></i></a>
+                <a id="user-action" href="login.html" class="btn btn-primary">Entrar</a>
+            </div>
+            <button class="menu-toggle"><i class="fas fa-bars"></i></button>
+        </div>
+    </header>
+
+    <main>
+        <!-- Hero Section com Wallpaper Dinâmico -->
+        <section class="brand-hero" id="brand-hero">
+            <div class="hero-wallpaper" id="hero-wallpaper"></div>
+            <div class="hero-overlay"></div>
+            <div class="hero-content">
+                <div class="logo-wrapper" id="logo-wrapper">
+                    <img id="brand-logo" src="images/favicon.png" alt="Logo da Franquia" class="brand-logo">
+                </div>
+                <h1 id="brand-title" class="brand-title">Carregando Multiverso...</h1>
+            </div>
+        </section>
+
+        <!-- Navegação de Abas do Multiverso -->
+        <section class="brand-tabs-section">
+            <div class="container">
+                <div class="brand-tabs" id="brand-tabs">
+                    <button class="tab-btn active" id="tab-destaque" data-tab="destaque">
+                        <i class="fas fa-star"></i> Destaque
+                    </button>
+                    <button class="tab-btn" id="tab-todos" data-tab="todos">
+                        <i class="fas fa-th-list"></i> Todos
+                    </button>
+                    <button class="tab-btn" id="tab-filmes" data-tab="filmes">
+                        <i class="fas fa-film"></i> Filmes
+                    </button>
+                    <button class="tab-btn" id="tab-series" data-tab="series">
+                        <i class="fas fa-tv"></i> Séries
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Controles Locais: Pesquisa e Ordenação -->
+        <section class="brand-controls-section">
+            <div class="container brand-controls-container">
+                <div class="local-search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="local-search-input" placeholder="Filtrar nesta aba...">
+                </div>
+                <div class="sorting-controls">
+                    <span class="sort-label">Ordenar por:</span>
+                    <div class="sort-buttons">
+                        <button class="sort-btn active" id="sort-lancamento" data-sort="lancamento">
+                            Lançamento
+                        </button>
+                        <button class="sort-btn" id="sort-cronologia" data-sort="cronologia">
+                            Cronologia
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Grid de Conteúdo -->
+        <section class="content-section">
+            <div class="container" id="content-grid">
+                <div class="content-grid-wrapper" id="grid-items">
+                    <div class="loading-spinner">
+                        <i class="fas fa-spinner fa-spin"></i> Sintonizando o Multiverso...
+                    </div>
+                </div>
+                <!-- Contêiner de Paginação -->
+                <div id="pagination-container" class="pagination-container"></div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modal de Vídeo (Player/Trailer) -->
+    <div id="video-modal" class="video-modal">
+        <div class="video-modal-content">
+            <span id="close-player" class="close-btn">&times;</span>
+            <iframe id="video-iframe" width="100%" height="100%" src="" frameborder="0"
+                allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+        </div>
+    </div>
+
+    <!-- Assistente Virtual BryIA -->
+    <div id="bryia-fab" class="bryia-fab">
+        <i class="fa-brands fa-bilibili"></i>
+    </div>
+
+    <div id="bryia-window" class="bryia-window">
+        <div class="bryia-header">
+            <div class="bryia-title">
+                <i class="fa-brands fa-bilibili"></i> BryIA <span>Assistente</span>
+            </div>
+            <button id="close-bryia"><i class="fas fa-times"></i></button>
+        </div>
+
+        <div class="bryia-messages" id="bryia-messages">
+            <div class="message bot">
+                <div class="msg-text">Olá! Eu sou a BryIA. Posso te indicar filmes, séries ou animes. O que você quer
+                    assistir hoje? 🍿📽</div>
+            </div>
+        </div>
+
+        <div class="bryia-input-area">
+            <input type="text" id="bryia-input" placeholder="Ex: Filme de terror no espaço...">
+            <button id="bryia-send"><i class="fas fa-paper-plane"></i></button>
+        </div>
+    </div>
+
+    <!-- Botão Surpreenda-me -->
+    <div class="surpreenda-fab" onclick="surpreendaMe()">
+        <i class="fas fa-random"></i> <span>Surpreenda-me</span>
+    </div>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2026 WinBry | Todos os direitos reservados.</p>
+            <div class="social-links">
+                <a href="#"><i class="fab fa-facebook-f"></i></a>
+                <a href="#"><i class="fab fa-twitter"></i></a>
+                <a href="#"><i class="fab fa-instagram"></i></a>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Bottom Nav para Dispositivos Móveis -->
+    <nav class="bottom-nav">
+        <a href="index.html" class="nav-item">
+            <i class="fas fa-home"></i>
+            <span>Início</span>
+        </a>
+        <a href="filmes.html" class="nav-item">
+            <i class="fas fa-film"></i>
+            <span>Filmes</span>
+        </a>
+        <a href="series.html" class="nav-item">
+            <i class="fas fa-tv"></i>
+            <span>Séries</span>
+        </a>
+        <a href="animes.html" class="nav-item">
+            <i class="fas fa-dragon"></i>
+            <span>Animes</span>
+        </a>
+        <a href="canais.html" class="nav-item">
+            <i class="fas fa-broadcast-tower"></i>
+            <span>Canais</span>
+        </a>
+        <a href="formulario.html" class="nav-item">
+            <i class="fas fa-comments"></i>
+            <span>Pedir</span>
+        </a>
+    </nav>
+
+    <!-- Scripts do App e do Multiverso -->
+    <script src="app.js?v=2026.06.29.2"></script>
+    <script src="multiverso.js?v=2026.06.29.2"></script>
+</body>
+
+</html>

@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 
 <head>
@@ -16,6 +16,37 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <style>
+    .login-divider {
+      display: flex;
+      align-items: center;
+      text-align: center;
+      margin: 20px 0;
+      color: #666;
+    }
+    .login-divider::before,
+    .login-divider::after {
+      content: '';
+      flex: 1;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .login-divider:not(:empty)::before {
+      margin-right: .25em;
+    }
+    .login-divider:not(:empty)::after {
+      margin-left: .25em;
+    }
+    .login-divider span {
+      padding: 0 10px;
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .forgot-password-link:hover {
+      color: #e50914 !important;
+      text-decoration: underline !important;
+    }
+  </style>
 </head>
 
 <body class="dark-mode login-page">
@@ -29,17 +60,40 @@
       </div>
 
       <h2>Quem está assistindo?</h2>
-      <p class="login-subtitle">Entre com sua conta Google para desbloquear o universo de filmes e séries mais expandido.</p>
+      <p class="login-subtitle" style="margin-bottom: 25px;">Entre com sua conta para acessar o universo expandido de filmes e séries.</p>
 
-      <button id="btn-google-login" class="btn-google-premium">
+      <form id="loginForm" style="margin-bottom: 20px;">
+        <div class="form-group">
+          <label for="email">E-mail</label>
+          <input type="email" id="email" required placeholder="Digite seu e-mail">
+        </div>
+        <div class="form-group" style="margin-bottom: 10px;">
+          <label for="senha">Senha</label>
+          <input type="password" id="senha" required placeholder="Digite sua senha">
+        </div>
+        <div style="text-align: right; margin-bottom: 20px;">
+          <a href="#" id="btn-esqueci-senha" class="forgot-password-link" style="color: #aaa; font-size: 0.85rem; text-decoration: none; transition: color 0.2s;">Esqueceu a senha?</a>
+        </div>
+        <button type="submit" class="btn btn-primary btn-full">Entrar</button>
+      </form>
+
+      <div class="login-divider">
+        <span>ou</span>
+      </div>
+
+      <button id="btn-google-login" class="btn-google-premium" style="margin-top: 10px;">
         <div class="google-icon-wrapper">
           <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="G">
         </div>
         <span>Continuar com Google</span>
       </button>
 
+      <p class="auth-link" style="text-align: center; margin-top: 25px; color: #888;">
+        Não tem uma conta? <a href="cadastro.html" style="color: #fff; font-weight: bold; text-decoration: none;">Cadastre-se</a>
+      </p>
+
       <div class="login-footer">
-        <p>Ambiente seguro e autenticado pelo Google.</p>
+        <p>Ambiente seguro e autenticado.</p>
       </div>
     </div>
   </div>

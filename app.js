@@ -3195,7 +3195,16 @@ const BryIA = {
             if (msg.type === 'card') {
                 this.createCardHtml(msg.data, false);
             } else {
-                this.appendMsg(msg.text, msg.role, false, false);
+                let textToDisplay = msg.text;
+                if (msg.role === 'bot') {
+                    // Formata tags [BUSCA:...] e markdown para exibição
+                    const searchRegex = /\[BUSCA:(.*?)\]/g;
+                    textToDisplay = msg.text
+                        .replace(/\n/g, '<br>')
+                        .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
+                        .replace(searchRegex, "<b>$1</b>");
+                }
+                this.appendMsg(textToDisplay, msg.role, false, false);
             }
         });
         this.scrollToBottom();
@@ -3279,17 +3288,19 @@ const BryIA = {
             return;
         }
 
-        const loadingId = this.appendMsg("Digitando...", 'bot', false, true);
+        const loadingEl = this.appendMsg("Digitando...", 'bot', false, true);
 
         try {
             const reply = await this.callGemini(key);
-            const loadEl = document.getElementById(loadingId);
-            if (loadEl) loadEl.remove();
+            if (loadingEl && loadingEl.parentNode) {
+                loadingEl.remove();
+            }
             await this.processResponse(reply);
 
         } catch (error) {
-            const loadEl = document.getElementById(loadingId);
-            if (loadEl) loadEl.remove();
+            if (loadingEl && loadingEl.parentNode) {
+                loadingEl.remove();
+            }
 
             if (this.chatHistory.length > 0 && this.chatHistory[this.chatHistory.length - 1].role === 'user') {
                 this.chatHistory.pop();
@@ -3312,16 +3323,13 @@ const BryIA = {
     },
 
     async callGemini(key) {
-        const modelName = "gemini-flash-latest";
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`;
-
         let contextoPagina = "";
         const tituloNaTela = document.querySelector('.info-text h1');
         if (tituloNaTela) contextoPagina = `O usuário está vendo: "${tituloNaTela.innerText}".`;
         else if (window.location.pathname.includes('minha-lista')) contextoPagina = "O usuário está na 'Minha Lista'.";
 
         const historyForGemini = this.chatHistory
-            .slice(-16) // Janela de contexto estendida para 16 mensagens para incluir cards e falas
+            .slice(-6) // Reduzido para 6 mensagens para latência mínima e resposta imediata
             .map(msg => {
                 let textContent = msg.text || "";
                 if (msg.type === 'card' && msg.data) {
@@ -3339,35 +3347,44 @@ const BryIA = {
         // --- INJEÇÃO INVISÍVEL À PROVA DE FALHAS (CORREÇÃO DE TAGS E RECOMENDAÇÕES) ---
         if (historyForGemini.length > 0 && historyForGemini[historyForGemini.length - 1].role === 'user') {
             const lastMsg = historyForGemini[historyForGemini.length - 1];
-            lastMsg.parts[0].text = `[INSTRUÇÃO CRÍTICA DE SISTEMA (BRYIA 2026): Você DEVE obrigatoriamente retornar as indicações/sugestões de filmes, séries ou animes utilizando a tag especial '[BUSCA:Nome exato da Obra Ano]' para cada obra listada (ex: [BUSCA:Meu Amigo Totoro 1988], [BUSCA:Titanic 1997]). NUNCA liste nomes de obras em texto comum ou sem a tag [BUSCA:...]. Escreva uma introdução simpática e use a frase exata "Aqui está:" ou "Aqui estão algumas opções incríveis:".]\n\nPergunta do Usuário: ${lastMsg.parts[0].text}`;
+            lastMsg.parts[0].text = `[INSTRUÇÃO CRÍTICA DE SISTEMA (BRYIA 2026): Responda em no MÁXIMO 2 ou 3 linhas curtas. NUNCA repita indicações anteriores da conversa! Varie as sugestões de acordo com o histórico. Se o usuário pediu 1 filme (singular), indique apenas UM filme (ex: [BUSCA:Devoradores de Estrelas 2026], [BUSCA:Coerência 2013], [BUSCA:Interestelar 2014]) com a tag '[BUSCA:Nome exato da Obra Ano]'. Use a frase exata "Aqui está:" para 1 indicação ou "Aqui estão algumas opções incríveis:" para listas.]\n\nPergunta do Usuário: ${lastMsg.parts[0].text}`;
         }
 
         const systemInstruction = `
         Você é a BryIA, assistente cinéfila oficial do WinBry. 🎬✨
         
-        SUA MISSÃO & REGRAS TEMPORAIS (VITAL):
-        - Você está rodando no ano de 2026. Você tem conhecimento integral de todas as produções de cinema, streaming, séries e animes lançados até o ano atual de 2026, bem como anúncios, produções em andamento e datas de lançamentos futuros previstas para 2026, 2027 e anos seguintes. Nunca diga que seu conhecimento é limitado a 2023 ou 2024. Você sabe de tudo sobre a atualidade do cinema de 2026!
-        - Seja carismática, utilize emojis (🍿, 📽️, ✨) e seja direta e prestativa.
+        SUA MISSÃO & REGRAS DE DINAMISMO (VITAL):
+        - Responda SEMPRE com textos ultra curtos, objetivos e diretos (máximo de 2 ou 3 linhas). Evite sinopses longas e apresentações repetitivas.
+        - VARIE SEMPRE as indicações: consulte o histórico do chat e NUNCA recomende o mesmo filme em turnos consecutivos. Se o usuário pedir outra opção ou insistir no tema, mude obrigatoriamente a obra indicada!
+        - Entenda perfeitamente o número solicitado pelo usuário:
+          1. Se o usuário pedir "um filme", "uma indicação", "um anime", "uma série" (no singular), retorne estritamente apenas UMA indicação!
+          2. Indique filmes/séries/animes interessantes, com personalidade cinéfila e "Lado B" (evite indicar sempre apenas blockbusters manjados como Duna ou Vingadores. Indique joias como [BUSCA:Devoradores de Estrelas 2026], [BUSCA:Coerência 2013], [BUSCA:Sunshine - Alerta Solar 2007], [BUSCA:Pandorum 2009]).
+          3. Toda indicação no singular DEVE ser de uma obra cadastrada no TMDB (já lançada ou confirmada) para que a interface carregue a capa certa e o botão Assistir funcione.
+          4. Se o usuário pedir listas, tops, ordem ou múltiplos filmes (ex: "indique 3 filmes", "filmes em ordem"), retorne as indicações em lista numerada compacta contendo as tags de busca.
+        - Você está rodando em 2026. Tem conhecimento de lançamentos futuros até 2028. Se o usuário pedir explicitamente lançamentos futuros de 2026-2028, traga variedade (como Devoradores de Estrelas, Supergirl, Vingadores: Doomsday, Duna: Parte Três).
         
-        ⚠️ REGRAS DE OURO PARA INDICAÇÕES E LISTAS (CRÍTICO):
-        - Quando o usuário pedir listas, sugestões, indicações de obras ou filmes por estúdio/gênero/tema (ex: "filmes do studio ghibli", "filme de terror da galáxia", "top 5 ação", etc.):
-          1. Comece SEMPRE a resposta com uma introdução simpática e direta que use a frase exata "Aqui está:" ou "Aqui estão algumas opções incríveis:" (ou variações muito próximas como "Aqui estão as melhores opções:").
-          2. Liste as obras logo abaixo. Para cada obra listada, você DEVE obrigatoriamente usar o formato de tag especial [BUSCA:Nome da Obra Ano].
-          3. NUNCA, SOB NENHUMA HIPÓTESE, liste o nome de um filme/série/anime em formato de texto comum (ex: sem a tag). Toda menção a obras deve conter a tag [BUSCA:Nome da Obra Ano] para que nossa interface capture o nome e monte automaticamente os cards enriquecidos com capas e botões de assistir. Se você não colocar a tag, os cards não aparecerão na tela!
+        📚 BANCO DE DADOS DE LANÇAMENTOS FUTUROS CONFIRMADOS (2026-2028):
+        - Devoradores de Estrelas (Project Hail Mary - Ryan Gosling, ficção científica intergaláctica): Lançamento em 2026.
+        - Supergirl: Woman of Tomorrow (2026)
+        - Dune: Part Three (2026)
+        - Avengers: Doomsday (2026)
+        - Star Wars: Starfighter (2027)
+        - Man of Tomorrow (2027)
+        - The Batman - Part II (2027)
+        - Avengers: Secret Wars (2027)
+        - Dynamic Duo (2028)
         
         ⚠️ REGRA CRÍTICA E ABSOLUTAMENTE OBRIGATÓRIA DA TAG [BUSCA]:
-        - Sempre que você citar, indicar, recomendar, sugerir ou fizer menção a QUALQUER filme, série, anime ou obra de ficção, você DEVE obrigatoriamente anexar a tag especial [BUSCA:Nome exato da Obra ANO] imediatamente após ou no lugar do nome da obra.
-        - O nome na tag deve ser o nome oficial da produção em português (ou como é conhecida no Brasil) e o ano deve ser o ano de lançamento original dela (ex: 2001, 1988, 2026).
+        - Sempre que você citar, indicar, recomendar, sugerir ou fizer menção a QUALQUER filme, série, anime ou obra de ficção, você DEVE obrigatoriamente usar a tag especial [BUSCA:Nome exato da Obra Ano] imediatamente após ou no lugar do nome da obra.
+        - O nome na tag deve ser o nome oficial da produção em português (ou como é amplamente conhecida no Brasil) e o ano deve ser o ano de lançamento original dela (ex: [BUSCA:A Viagem de Chihiro 2001], [BUSCA:Interestelar 2014]).
         
-        Exemplos de formato obrigatório:
-        - Usuário: "filmes de terror da galáxia" -> Resposta: "Aqui estão excelentes opções de terror no espaço para você se arrepiar! 🌌🛸🍿\n1. [BUSCA:Alien, o Oitavo Passageiro 1979] - O clássico absoluto do terror espacial.\n2. [BUSCA:O Enigma do Horizonte 1997] - Uma viagem perturbadora rumo ao inferno na galáxia.\n3. [BUSCA:Pandorum 2009] - Sobrevivência e loucura a bordo de uma espaçonave gigante."
-        - Usuário: "Qual o top 3 do Ghibli?" -> Resposta: "O Studio Ghibli é maravilhoso! 🌌✨ Aqui estão as 3 maiores obras-primas:\n1. [BUSCA:A Viagem de Chihiro 2001] - Uma fantástica jornada espiritual.\n2. [BUSCA:Meu Amigo Totoro 1988] - Um clássico doce e poético.\n3. [BUSCA:O Castelo Animado 2004] - Uma magia deslumbrante."
+        Exemplos de formato de resposta obrigatório (respostas curtas):
+        - Usuário: "indique um filme de ficção científica" -> Resposta: "Aqui está uma excelente indicação de viagem no tempo e ficção científica para você! 🚀🌌🍿\n[BUSCA:Interestelar 2014] - Uma obra-prima sobre exploração de buracos negros e amor familiar."
+        - Usuário: "Qual o top 3 do Ghibli?" -> Resposta: "Aqui estão as 3 maiores obras-primas do Studio Ghibli! 🌌✨🍿\n1. [BUSCA:A Viagem de Chihiro 2001] - Uma fantástica jornada espiritual.\n2. [BUSCA:Meu Amigo Totoro 1988] - Um clássico doce e poético.\n3. [BUSCA:O Castelo Animado 2004] - Uma magia deslumbrante."
         
         ⚠️ MEMÓRIA DE CARDS NA TELA (MUITO IMPORTANTE):
         - No histórico da conversação, você receberá mensagens do sistema no formato: "[Sistema: Card de assistir exibido na tela para a obra: 'Nome (Ano)']".
-        - Isso significa que você já enviou o card interativo com capa e botão de assistir para o usuário na tela do chat!
-        - Utilize essa informação para manter o contexto cinéfilo perfeito da conversa. Por exemplo, se o usuário disser "gostei do primeiro" ou "quero ver o segundo", você saberá exatamente qual filme foi exibido nos cards anteriores baseando-se no histórico de cards na tela!
-        - Lembre-se sempre de que sua missão principal é exibir cards interativos de filmes de forma proativa no chat.
+        - Utilize essa informação para manter o contexto cinéfilo perfeito da conversa.
         
         Contexto atual da página: ${contextoPagina}
         `;
@@ -3377,28 +3394,57 @@ const BryIA = {
             contents: historyForGemini
         };
 
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
+        const models = [
+            "gemini-3.5-flash",
+            "gemini-2.5-flash",
+            "gemini-2.5-flash-lite",
+            "gemini-1.5-flash"
+        ];
 
-        const data = await response.json();
+        let lastError = null;
 
-        if (response.status === 429) {
-            throw new Error("Quota exceeded (429)");
+        for (const modelName of models) {
+            try {
+                console.log(`🤖 Tentando obter resposta com o modelo: ${modelName}...`);
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`;
+                
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+
+                if (response.status === 429) {
+                    throw new Error("Limite de quota atingido (429)");
+                }
+
+                if (!response.ok) {
+                    throw new Error((data.error && data.error.message) ? data.error.message : `Erro API: ${response.status}`);
+                }
+
+                if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
+                    const blockReason = (data.promptFeedback && data.promptFeedback.blockReason) ? data.promptFeedback.blockReason : null;
+                    throw new Error(blockReason ? `Bloqueado: ${blockReason}` : "Sem resposta do modelo.");
+                }
+
+                const resultText = data.candidates[0].content.parts[0].text;
+                console.log(`✅ Sucesso com o modelo: ${modelName}!`);
+                return resultText;
+
+            } catch (e) {
+                console.warn(`⚠️ Falha ao chamar o modelo ${modelName}: ${e.message}`);
+                lastError = e;
+                if (e.message.toLowerCase().includes('key') || e.message.toLowerCase().includes('400')) {
+                    break;
+                }
+                // Aguarda 150ms antes de tentar o próximo modelo (folga rápida para o servidor)
+                await new Promise(resolve => setTimeout(resolve, 150));
+            }
         }
 
-        if (!response.ok) {
-            throw new Error((data.error && data.error.message) ? data.error.message : `Erro API: ${response.status}`);
-        }
-
-        if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
-            const blockReason = (data.promptFeedback && data.promptFeedback.blockReason) ? data.promptFeedback.blockReason : null;
-            throw new Error(blockReason ? `Bloqueado: ${blockReason}` : "Sem resposta do modelo.");
-        }
-
-        return data.candidates[0].content.parts[0].text;
+        throw lastError || new Error("Falha ao se comunicar com os servidores do Gemini após tentar múltiplos modelos.");
     },
 
 
@@ -3414,32 +3460,45 @@ const BryIA = {
             if (termo) termos.add(termo);
         }
 
-        // 2. Fallbacks Inteligentes: captura menções se o modelo de linguagem esquecer a tag
-        // Fallback A: Negrito seguido de Ano, ex: **Titanic** (1997)
-        const negritoAnoRegex = /\*\*([^*]+?)\*\*\s*\((\d{4})\)/g;
-        let negritoMatch;
-        negritoAnoRegex.lastIndex = 0;
-        while ((negritoMatch = negritoAnoRegex.exec(text)) !== null) {
-            const nome = negritoMatch[1].trim();
-            const ano = negritoMatch[2].trim();
-            if (nome && nome.length > 1 && nome.length < 60) {
-                termos.add(`${nome} ${ano}`);
-            }
-        }
+        // 2. Fallbacks Inteligentes de Segurança: Entra em ação apenas se nenhuma tag [BUSCA:...] for gerada
+        if (termos.size === 0) {
+            console.log("🔍 Nenhum termo com [BUSCA] encontrado. Iniciando análise de fallback inteligente...");
+            
+            // Fallback A: Processamento linha por linha para listas de texto simples (ex: "1. Duna: Parte Três 2026 - O encerramento...")
+            const linhas = text.split(/\r?\n/);
+            linhas.forEach(linha => {
+                const listMatch = linha.trim().match(/^(?:\d+\.\s+|-\s+|\*\s+)(.+)$/);
+                if (listMatch) {
+                    const conteudoLinha = listMatch[1].trim();
+                    const anoMatch = conteudoLinha.match(/\b(19\d{2}|20\d{2})\b/);
+                    if (anoMatch) {
+                        const ano = anoMatch[1];
+                        const partes = conteudoLinha.split(ano);
+                        const possivelTitulo = partes[0].trim();
+                        // Limpa caracteres residuais comuns no fim do título (como dois pontos, hífens, parênteses e negritos)
+                        const tituloLimpo = possivelTitulo
+                            .replace(/[\s\-:\(\)\*]+$/, '')
+                            .replace(/^\*\*|\*\*$/g, '')
+                            .trim();
+                        
+                        if (tituloLimpo && tituloLimpo.length > 1 && tituloLimpo.length < 60) {
+                            console.log(`✨ Fallback de Lista detectou: "${tituloLimpo}" (${ano})`);
+                            termos.add(`${tituloLimpo} ${ano}`);
+                        }
+                    }
+                }
+            });
 
-        // Fallback B: Lista Numerada com Negrito, ex: "1. **Inception** (2010)" ou "1. **Inception**"
-        const listaNegritoRegex = /(?:\d+\.\s+)\*\*([^*]+?)\*\*/g;
-        let listaMatch;
-        listaNegritoRegex.lastIndex = 0;
-        while ((listaMatch = listaNegritoRegex.exec(text)) !== null) {
-            const nome = listaMatch[1].trim();
-            if (nome && nome.length > 1 && nome.length < 60) {
-                const trecho = text.substring(listaMatch.index, listaMatch.index + 100);
-                const anoMatch = trecho.match(/\((\d{4})\)/);
-                if (anoMatch) {
-                    termos.add(`${nome} ${anoMatch[1]}`);
-                } else {
-                    termos.add(nome);
+            // Fallback B: Captura geral no texto de recomendações em negrito (ex: "**Divertidamente 2** (2024)" ou "**Deadpool** 2024")
+            const negritoAnoRegex = /\*\*([^*]+?)\*\*\s*\(?(\d{4})\)?/g;
+            let negritoMatch;
+            negritoAnoRegex.lastIndex = 0;
+            while ((negritoMatch = negritoAnoRegex.exec(text)) !== null) {
+                const nome = negritoMatch[1].trim();
+                const ano = negritoMatch[2].trim();
+                if (nome && nome.length > 1 && nome.length < 60) {
+                    console.log(`✨ Fallback de Negrito detectou: "${nome}" (${ano})`);
+                    termos.add(`${nome} ${ano}`);
                 }
             }
         }
@@ -3447,8 +3506,8 @@ const BryIA = {
         // Formata o texto final com quebras de linha e negritos para renderização no balão
         let formattedText = text.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(searchRegex, "<b>$1</b>");
         
-        // Cria o balão de texto da IA e captura a div correspondente
-        const messageEl = this.appendMsg(formattedText, 'bot', true);
+        // Cria o balão de texto da IA e captura a div correspondente (salvamos o texto original com as tags intactas)
+        const messageEl = this.appendMsg(formattedText, 'bot', true, false, text);
 
         // Realiza as requisições em paralelo no TMDB e monta os cards proativos
         const promessas = [];
@@ -3461,11 +3520,9 @@ const BryIA = {
         }
     },
 
-    // --- CORREÇÃO TÉCNICA: FILTRO DE ANO ---
     async searchAndCreateCard(query, shouldSave = false, targetMessageElement = null) {
         try {
             // 1. Tenta extrair um ano da busca (ex: "Resident Evil 2002")
-            // Regex procura por 4 dígitos no final da string
             const yearMatch = query.match(/(.*?)\s?(\d{4})$/);
 
             let searchTerm = query;
@@ -3477,37 +3534,85 @@ const BryIA = {
                 console.log(`🔍 Filtro Inteligente: Buscando "${searchTerm}" do ano ${targetYear}`);
             }
 
-            const data = await fetchTMDB(`/search/multi?query=${encodeURIComponent(searchTerm)}&include_adult=false&language=pt-BR`);
+            // Realiza a busca no TMDB (primeiro como filme, pois é mais assertivo para subtítulos e nomes completos)
+            let data = await fetchTMDB(`/search/movie?query=${encodeURIComponent(searchTerm)}`);
+
+            // Se não achar nada, tenta buscar como série/show de TV
+            if (!data || !data.results || data.results.length === 0) {
+                data = await fetchTMDB(`/search/tv?query=${encodeURIComponent(searchTerm)}`);
+            }
+
+            // Se a busca principal falhou e o termo contém delimitadores, tenta simplificar o título
+            if (!data || !data.results || data.results.length === 0) {
+                let simplificado = searchTerm;
+                if (searchTerm.includes(':')) {
+                    simplificado = searchTerm.split(':')[0].trim();
+                } else if (searchTerm.includes('–')) { // travessão unicode
+                    simplificado = searchTerm.split('–')[0].trim();
+                } else if (searchTerm.includes('-')) { // hífen
+                    simplificado = searchTerm.split('-')[0].trim();
+                } else {
+                    const palavras = searchTerm.split(/\s+/);
+                    if (palavras.length > 2) {
+                        simplificado = palavras.slice(0, 2).join(' '); // tenta as 2 primeiras palavras
+                    }
+                }
+                if (simplificado !== searchTerm) {
+                    console.log(`🔍 Tentando busca por termo simplificado: "${simplificado}"`);
+                    data = await fetchTMDB(`/search/movie?query=${encodeURIComponent(simplificado)}`);
+                    if (!data || !data.results || data.results.length === 0) {
+                        data = await fetchTMDB(`/search/tv?query=${encodeURIComponent(simplificado)}`);
+                    }
+                }
+            }
+
+            // Se ainda assim falhou, tenta buscar apenas pela primeira palavra do título
+            if (!data || !data.results || data.results.length === 0) {
+                const primeiraPalavra = searchTerm.split(/\s+/)[0];
+                if (primeiraPalavra && primeiraPalavra.length > 2) {
+                    console.log(`🔍 Tentando busca por primeira palavra: "${primeiraPalavra}"`);
+                    data = await fetchTMDB(`/search/movie?query=${encodeURIComponent(primeiraPalavra)}`);
+                }
+            }
+
+            let bestMatch = null;
 
             if (data && data.results && data.results.length > 0) {
-                let bestMatch = null;
-
-                // 2. Se temos um ano alvo, filtramos os resultados
+                // 2. Se temos um ano alvo, tenta filtrar os resultados que batem com tolerância fuzzy de +/- 1 ano
                 if (targetYear) {
+                    const targetYearNum = parseInt(targetYear, 10);
                     bestMatch = data.results.find(i => {
                         const date = i.release_date || i.first_air_date || "";
-                        // Verifica se o ano bate (começa com 2002...) e se tem poster
-                        return date.startsWith(targetYear) && i.poster_path;
+                        if (!date) return false;
+                        const year = parseInt(date.substring(0, 4), 10);
+                        return Math.abs(year - targetYearNum) <= 1 && i.poster_path;
                     });
                 }
 
-                // 3. Se não achou com o ano (ou não tinha ano), pega o primeiro válido normal
-                if (!bestMatch) {
-                    bestMatch = data.results.find(i => (i.media_type === 'movie' || i.media_type === 'tv') && i.poster_path);
-                }
-
-                // 4. Fallback tolerante se ainda não achou nada com poster
+                // 3. Se não achou com o ano correspondente (ou não tinha ano), pega o primeiro resultado com poster
                 if (!bestMatch) {
                     bestMatch = data.results.find(i => i.poster_path);
                 }
 
-                // 5. Fallback final: pega o primeiro resultado da busca geral
+                // 4. Fallback final: pega o primeiro resultado geral da busca
                 if (!bestMatch && data.results.length > 0) {
                     bestMatch = data.results[0];
                 }
-
-                if (bestMatch) this.createCardHtml(bestMatch, shouldSave, targetMessageElement);
             }
+
+            // 5. Garantia Absoluta: se a busca falhar ou o TMDB não encontrar o filme, gera um card de fallback mockado
+            if (!bestMatch) {
+                console.log(`⚠️ Obra "${searchTerm}" não encontrada no TMDB. Gerando card de fallback local...`);
+                bestMatch = {
+                    title: searchTerm,
+                    release_date: targetYear ? `${targetYear}-01-01` : '2026-01-01',
+                    poster_path: null,
+                    media_type: 'movie',
+                    id: 0 // Indica card de fallback local
+                };
+            }
+
+            this.createCardHtml(bestMatch, shouldSave, targetMessageElement);
         } catch (e) { console.error(e); }
     },
 
@@ -3528,20 +3633,24 @@ const BryIA = {
         const year = (item.release_date || item.first_air_date || '????').substring(0, 4);
         const type = item.media_type || 'movie';
 
+        const isMocked = item.id === 0;
         const cardHtml = `
-            <div class="bryia-card">
+            <div class="bryia-card" ${isMocked ? 'style="border-color: rgba(229, 9, 20, 0.3) !important;"' : ''}>
                 <img src="${poster}" onerror="this.src='images/favicon.png'">
                 <div class="bryia-card-info">
                     <h4>${title} <small>(${year})</small></h4>
-                    <a href="detalhes.html?id=${item.id}&type=${type}" class="btn-play-mini">
-                        <i class="fas fa-play"></i> Assistir
+                    <a href="${isMocked ? '#' : `detalhes.html?id=${item.id}&type=${type}`}" 
+                       class="btn-play-mini" 
+                       ${isMocked ? 'style="opacity:0.55; cursor:not-allowed; background:#333; box-shadow:none; pointer-events:none;" onclick="return false;"' : ''}>
+                        <i class="fas ${isMocked ? 'fa-calendar-alt' : 'fa-play'}"></i> ${isMocked ? 'Em Breve' : 'Assistir'}
                     </a>
                 </div>
             </div>`;
 
+        let cardsContainer;
         if (container) {
             // Verifica se a div do container de cards já existe na mensagem bot
-            let cardsContainer = container.querySelector('.bryia-cards-container');
+            cardsContainer = container.querySelector('.bryia-cards-container');
             if (!cardsContainer) {
                 cardsContainer = document.createElement('div');
                 cardsContainer.className = 'bryia-cards-container';
@@ -3551,11 +3660,29 @@ const BryIA = {
             cardsContainer.insertAdjacentHTML('beforeend', cardHtml);
         } else {
             // Fallback se não encontrar nenhuma mensagem bot (segurança)
-            const div = document.createElement('div');
-            div.className = 'message bot';
-            div.style.cssText = "background:transparent; padding:0; margin-top:5px; max-width:90%;";
-            div.innerHTML = `<div class="bryia-cards-container" style="display: flex; flex-direction: column; gap: 10px; width: 100%;">${cardHtml}</div>`;
-            this.elements.msgs.appendChild(div);
+            cardsContainer = this.elements.msgs.querySelector('.bryia-fallback-container');
+            if (!cardsContainer) {
+                const div = document.createElement('div');
+                div.className = 'message bot';
+                div.style.cssText = "background:transparent; padding:0; margin-top:5px; max-width:90%;";
+                div.innerHTML = `<div class="bryia-cards-container bryia-fallback-container" style="display: flex; flex-direction: column; gap: 10px; width: 100%;"></div>`;
+                this.elements.msgs.appendChild(div);
+                cardsContainer = div.querySelector('.bryia-fallback-container');
+            }
+            cardsContainer.insertAdjacentHTML('beforeend', cardHtml);
+        }
+
+        // Se houver mais de um card no container, ativamos o grid-layout e limpamos estilos de flex inline
+        if (cardsContainer) {
+            if (cardsContainer.children.length > 1) {
+                cardsContainer.classList.add('grid-layout');
+                cardsContainer.style.display = "";
+                cardsContainer.style.flexDirection = "";
+            } else {
+                cardsContainer.classList.remove('grid-layout');
+                cardsContainer.style.display = "flex";
+                cardsContainer.style.flexDirection = "column";
+            }
         }
 
         this.scrollToBottom();
@@ -3566,7 +3693,7 @@ const BryIA = {
         }
     },
 
-    appendMsg(text, sender, shouldSave = false, isLoading = false) {
+    appendMsg(text, sender, shouldSave = false, isLoading = false, textToSave = null) {
         const div = document.createElement('div');
         div.className = `message ${sender}`;
         if (isLoading) div.id = 'loading-msg';
@@ -3579,11 +3706,12 @@ const BryIA = {
         this.scrollToBottom();
 
         if (shouldSave) {
-            this.chatHistory.push({ role: sender, type: 'text', text: text, timestamp: Date.now() });
+            const finalSaveText = textToSave !== null ? textToSave : text;
+            this.chatHistory.push({ role: sender, type: 'text', text: finalSaveText, timestamp: Date.now() });
             this.saveLocalHistory();
         }
 
-        return isLoading ? 'loading-msg' : div;
+        return div;
     },
 
     scrollToBottom() {

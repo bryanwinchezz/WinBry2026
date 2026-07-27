@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WinBry | Canais</title>
+    <meta name="description" content="WinBry | Assista a Canais de TV Ao Vivo, Jogos Esportivos e Guia de Programação EPG online com qualidade HD.">
+    <meta name="keywords" content="filmes online, séries, animes, canais ao vivo, assistir grátis, hd, streaming, WinBry">
+    <meta name="author" content="WinBry">
+    <meta name="theme-color" content="#e50914">
+    <!-- Política Anti-Bloqueio de Referrer para Embeds de Vídeo -->
+    <meta name="referrer" content="no-referrer">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/core-js/3.32.1/minified.js"></script>
+    <link rel="icon" type="image/x-icon" href="images/favicon.png">
+    <link rel="stylesheet" href="style.css?v=2026.05.22.4">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#e50914">
+
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+</head>
+
+<body class="dark-mode">
+    <!-- Header Principal Oficial do WinBry (EXATAMENTE IGUAL À ABA INÍCIO) -->
+    <header>
+        <div class="container">
+            <div class="logo">
+                <a class="btn-log" href="index.html">WinBry</a>
+            </div>
+            <nav class="main-nav">
+                <ul>
+                    <li><a href="index.html">Início</a></li>
+                    <li><a href="filmes.html">Filmes</a></li>
+                    <li><a href="series.html">Séries</a></li>
+                    <li><a href="animes.html">Animes</a></li>
+                    <li><a href="canais.html" class="active">Canais</a></li>
+                </ul>
+            </nav>
+            <div class="user-actions">
+                <div class="search-box">
+                    <input type="text" id="search-input" placeholder="Buscar canais ou jogos...">
+                    <a id="search-icon" class="icon-btn"><i class="fas fa-search"></i></a>
+                </div>
+                <a id="theme-toggle" class="icon-btn"><i class="fas fa-sun"></i></a>
+                <a href="formulario.html" class="icon-btn"><i class="fas fa-comments"></i></a>
+                <a href="minha-lista.html" class="icon-btn"><i class="fas fa-bookmark"></i></a>
+                <a id="user-action" href="login.html" class="btn btn-primary">Entrar</a>
+            </div>
+            <button class="menu-toggle"><i class="fas fa-bars"></i></button>
+        </div>
+    </header>
+
+    <main>
+        <section class="content-section" style="padding-top: 100px; padding-bottom: 60px;">
+            <div class="container">
+                <!-- Cabeçalho da Seção estilo WinBry -->
+                <div class="section-header-clean">
+                    <div>
+                        <h1 id="sectionTitle" class="winbry-section-title">Canais de TV Ao Vivo</h1>
+                        <p id="sectionSubtitle" class="winbry-section-desc">Transmissões ao vivo em HD com guia de programação em tempo real.</p>
+                    </div>
+
+                    <!-- Botões de Troca de Aba (Canais, Agenda) -->
+                    <div class="sort-buttons">
+                        <button class="sort-btn winbry-tab-btn active" data-tab="channels" id="tabChannels">
+                            <i class="fas fa-tv"></i> Canais
+                        </button>
+                        <button class="sort-btn winbry-tab-btn" data-tab="events" id="tabEvents">
+                            <i class="fas fa-calendar-alt"></i> Agenda
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Barra de Categorias em Pílulas -->
+                <div id="categoryContainer" class="winbry-category-wrapper">
+                    <div id="categoryFilters" class="winbry-categories-bar">
+                        <button class="winbry-cat-btn active" data-category="all">
+                            Todos
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Grade de Conteúdo (Canais/Eventos/EPG) -->
+                <div id="contentGrid" class="winbry-channels-grid">
+                    <div class="loader-container">
+                        <div class="spinner"></div>
+                        <p>Carregando transmissões...</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modal de Seleção de Opções de Transmissão -->
+    <div id="playerModal" class="video-modal">
+        <div class="video-modal-content winbry-modal-content">
+            <span id="closeModalBtn" class="close-btn"><i class="fas fa-times"></i></span>
+            <div id="modalBody"></div>
+        </div>
+    </div>
+
+    <!-- Floating BryIA Assistant -->
+    <div id="bryia-fab" class="bryia-fab">
+        <i class="fa-brands fa-bilibili"></i>
+    </div>
+
+    <div id="bryia-window" class="bryia-window">
+        <div class="bryia-header">
+            <div class="bryia-title">
+                <i class="fa-brands fa-bilibili"></i> BryIA <span>Assistente</span>
+            </div>
+            <button id="close-bryia"><i class="fas fa-times"></i></button>
+        </div>
+
+        <div class="bryia-messages" id="bryia-messages">
+            <div class="message bot">
+                <div class="msg-text">Olá! Eu sou a BryIA. Posso te indicar canais, filmes ou séries. O que você quer assistir hoje? 🍿📽</div>
+            </div>
+        </div>
+
+        <div class="bryia-input-area">
+            <input type="text" id="bryia-input" placeholder="Ex: Canal de notícias ou jogo de futebol...">
+            <button id="bryia-send"><i class="fas fa-paper-plane"></i></button>
+        </div>
+    </div>
+
+    <div class="surpreenda-fab" onclick="surpreendaMe()">
+        <i class="fas fa-random"></i> <span>Surpreenda-me</span>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Footer Padrão Oficial do WinBry (IDÊNTICO À ABA INÍCIO) -->
+    <footer>
+        <div class="container">
+            <p>&copy; 2026 WinBry | Todos os direitos reservados.</p>
+            <div class="social-links">
+                <a href="#"><i class="fab fa-facebook-f"></i></a>
+                <a href="#"><i class="fab fa-twitter"></i></a>
+                <a href="#"><i class="fab fa-instagram"></i></a>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Navegação Mobile Padrão Oficial do WinBry (IDÊNTICO À ABA INÍCIO) -->
+    <nav class="bottom-nav">
+        <a href="index.html" class="nav-item">
+            <i class="fas fa-home"></i>
+            <span>Início</span>
+        </a>
+        <a href="filmes.html" class="nav-item">
+            <i class="fas fa-film"></i>
+            <span>Filmes</span>
+        </a>
+        <a href="series.html" class="nav-item">
+            <i class="fas fa-tv"></i>
+            <span>Séries</span>
+        </a>
+        <a href="animes.html" class="nav-item">
+            <i class="fas fa-dragon"></i>
+            <span>Animes</span>
+        </a>
+        <a href="canais.html" class="nav-item active">
+            <i class="fas fa-broadcast-tower"></i>
+            <span>Canais</span>
+        </a>
+        <a href="formulario.html" class="nav-item">
+            <i class="fas fa-comments"></i>
+            <span>Pedir</span>
+        </a>
+    </nav>
+
+    <!-- Scripts do WinBry (app.js + canais.js) -->
+    <script src="app.js?v=2026.05.22.4"></script>
+    <script src="canais.js"></script>
+</body>
+
+</html>

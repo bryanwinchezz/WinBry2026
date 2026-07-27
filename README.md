@@ -40,7 +40,6 @@ WinBry/
 ├── formulario-obrigado.html# Confirmação do formulário
 ├── app.js                  # Lógica principal da aplicação
 ├── main.js                 # Script de inicialização
-├── find_lines.js           # Utilitários de busca
 ├── style.css               # Estilos globais
 ├── manifest.json           # Manifesto PWA
 ├── images/                 # Assets visuais
